@@ -78,6 +78,7 @@ export async function runInstall(
     const envVars = [
       settings.ghcrUsername ? `GHCR_USER=${settings.ghcrUsername}` : '',
       settings.ghcrToken ? `GHCR_TOKEN=${settings.ghcrToken}` : '',
+      settings.firmwareImage ? `IMAGE=${settings.firmwareImage}` : '',
     ].filter(Boolean).join(' ');
 
     const command = `sudo ${envVars} bash /tmp/install.sh --hostname ${hostname} --json 2>&1`;
@@ -177,9 +178,11 @@ export async function runInstall(
     // No JSON result — construct one
     const result: InstallResult = {
       operation: 'install',
+      image: settings.firmwareImage,
+      version: null,
+      started_at: new Date().toISOString(),
+      finished_at: new Date().toISOString(),
       result: 'fail',
-      hostname,
-      error: 'No result received from install script',
       steps: [],
     };
     emit('install_complete', result);
