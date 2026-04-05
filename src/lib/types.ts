@@ -44,18 +44,18 @@ export const INSTALL_STEPS: { id: string; label: string }[] = [
 
 export interface InstallResult {
   operation: string;
+  image: string;
+  version: string | null;
+  started_at: string;
+  finished_at: string;
   result: 'pass' | 'fail';
-  hostname?: string;
-  firmware_version?: string;
-  sdr_status?: string;
-  error?: string;
-  failed_step?: string;
   steps: {
-    id: string;
+    id: number;
+    name: string;
     label: string;
-    result: 'pass' | 'fail' | 'skipped';
-    message?: string;
-    duration_ms?: number;
+    status: 'pass' | 'fail' | 'skipped';
+    message: string | null;
+    duration_s: number | null;
   }[];
 }
 

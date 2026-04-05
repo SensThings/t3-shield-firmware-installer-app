@@ -238,11 +238,11 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
           <h2 className="text-xl font-semibold text-zinc-100 mb-4">Device programmed successfully!</h2>
           <div className="space-y-2 text-sm text-zinc-400 mb-6">
             <p>Hostname: <span className="text-zinc-200 font-mono">T3S-{serialNumber.trim()}</span></p>
-            {result?.firmware_version && (
-              <p>Firmware: <span className="text-zinc-200">{result.firmware_version}</span></p>
+            {result?.version && (
+              <p>Firmware: <span className="text-zinc-200">{result.version}</span></p>
             )}
-            {result?.sdr_status && (
-              <p>SDR: <span className="text-emerald-400">{result.sdr_status}</span></p>
+            {result?.image && (
+              <p>Image: <span className="text-zinc-200 font-mono text-xs">{result.image}</span></p>
             )}
           </div>
           <button
