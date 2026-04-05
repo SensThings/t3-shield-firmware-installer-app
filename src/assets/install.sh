@@ -401,8 +401,17 @@ CTDEOF
 
 step_create_dirs() {
     mkdir -p "$DATA_DIR/logs" "$DATA_DIR/scan_results" "$OPT_DIR" 2>&1
+
+    # Set USB permissions for USRP B200/B210 SDR
+    # Without this, the container gets "USB open failed: insufficient permissions"
+    # even with --privileged. Vendor IDs: 2500=Ettus Research, 3923=National Instruments.
+    echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="2500", MODE="0666"' > /etc/udev/rules.d/99-uhd-usrp.rules
+    echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="3923", MODE="0666"' >> /etc/udev/rules.d/99-uhd-usrp.rules
+    udevadm control --reload-rules 2>/dev/null
+    udevadm trigger 2>/dev/null
+
     if [[ -d "$DATA_DIR/logs" && -d "$DATA_DIR/scan_results" && -d "$OPT_DIR" ]]; then
-        echo "Directories created"
+        echo "Directories and USB rules created"
         return 0
     else
         echo "Failed to create directories"
