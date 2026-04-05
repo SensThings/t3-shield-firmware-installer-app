@@ -1,43 +1,52 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Settings } from '@/lib/types';
 
 interface HeaderProps {
   onSettingsClick: () => void;
-  deviceIp: string;
+  settings: Settings;
 }
 
-export default function Header({ onSettingsClick, deviceIp }: HeaderProps) {
+export default function Header({ onSettingsClick, settings }: HeaderProps) {
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
   const [checking, setChecking] = useState(false);
-
-  const checkConnection = useCallback(async () => {
-    if (!deviceIp || checking) return;
-    setChecking(true);
-    try {
-      const res = await fetch('/api/settings/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          host: deviceIp,
-          username: 'sensthings',
-          password: 'Sensthings@012',
-        }),
-      });
-      const data = await res.json();
-      setConnectionStatus(data.success ? 'connected' : 'disconnected');
-    } catch {
-      setConnectionStatus('disconnected');
-    } finally {
-      setChecking(false);
-    }
-  }, [deviceIp, checking]);
+  const checkingRef = useRef(false);
 
   useEffect(() => {
+    const checkConnection = async () => {
+      if (!settings.deviceIp || checkingRef.current) return;
+      checkingRef.current = true;
+      setChecking(true);
+      try {
+        const res = await fetch('/api/settings/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            host: settings.deviceIp,
+            username: settings.sshUsername,
+            password: settings.sshPassword,
+          }),
+        });
+        const data = await res.json();
+        setConnectionStatus(data.success ? 'connected' : 'disconnected');
+      } catch {
+        setConnectionStatus('disconnected');
+      } finally {
+        setChecking(false);
+        checkingRef.current = false;
+      }
+    };
+
     checkConnection();
     const interval = setInterval(checkConnection, 30000);
     return () => clearInterval(interval);
-  }, [checkConnection]);
+  }, [settings.deviceIp, settings.sshUsername, settings.sshPassword]);
+
+  const statusLabel =
+    connectionStatus === 'connected' ? 'Device connected' :
+    connectionStatus === 'disconnected' ? 'Device unreachable' :
+    'Checking...';
 
   return (
     <header className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900">
@@ -51,7 +60,7 @@ export default function Header({ onSettingsClick, deviceIp }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2 text-sm text-zinc-400">
+        <div className="flex items-center gap-2 text-sm text-zinc-400" title={statusLabel}>
           <div
             className={`w-2.5 h-2.5 rounded-full ${
               connectionStatus === 'connected'
@@ -61,7 +70,7 @@ export default function Header({ onSettingsClick, deviceIp }: HeaderProps) {
                 : 'bg-zinc-600'
             } ${checking ? 'animate-pulse' : ''}`}
           />
-          <span>{deviceIp}</span>
+          <span>{settings.deviceIp}</span>
         </div>
 
         <button
