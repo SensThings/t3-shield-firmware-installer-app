@@ -109,6 +109,7 @@ export async function runInstall(
     let jsonBuffer = '';
     let collectingJson = false;
     const stepTimers = new Map<number, number>();
+    let allOutput = ''; // collect everything for fallback JSON extraction
 
     // Set up timeout
     const timeoutMs = 5 * 60 * 1000;
@@ -122,75 +123,104 @@ export async function runInstall(
       }
     });
 
-    const processLine = (trimmed: string) => {
-      if (!trimmed) return;
-
-      // Check for JSON result
-      if (trimmed.startsWith('{') && trimmed.includes('"operation"')) {
-        try {
-          finalJson = JSON.parse(trimmed);
-          log('Received final JSON result: %s', finalJson?.result);
-          return;
-        } catch {
-          collectingJson = true;
-          jsonBuffer = trimmed;
-          return;
+    const tryParseJson = (str: string): InstallResult | null => {
+      try {
+        const parsed = JSON.parse(str);
+        if (parsed && typeof parsed === 'object' && 'operation' in parsed) {
+          return parsed as InstallResult;
         }
+      } catch {
+        // not valid JSON
       }
+      return null;
+    };
 
-      if (collectingJson) {
-        jsonBuffer += trimmed;
-        try {
-          finalJson = JSON.parse(jsonBuffer);
-          collectingJson = false;
-          log('Received final JSON result (multi-line): %s', finalJson?.result);
-          return;
-        } catch {
-          return;
-        }
-      }
+    const processData = (data: string) => {
+      allOutput += data;
 
-      // Parse progress
-      const update = parseProgressLine(trimmed);
-      if (update) {
-        log('Step %d: %s — %s', update.stepNumber, update.message, update.status);
-        if (update.status === 'in_progress') {
-          stepTimers.set(update.stepNumber, Date.now());
-        } else if (update.status === 'pass' || update.status === 'fail') {
-          const startTime = stepTimers.get(update.stepNumber);
-          if (startTime) {
-            update.duration = (Date.now() - startTime) / 1000;
+      const lines = data.split('\n');
+      for (const rawLine of lines) {
+        const trimmed = rawLine.trim();
+        if (!trimmed) continue;
+
+        // Try to extract JSON from any line containing a { character
+        if (trimmed.includes('{') && trimmed.includes('"operation"')) {
+          // Extract the JSON substring starting from the first {
+          const jsonStart = trimmed.indexOf('{');
+          const candidate = trimmed.slice(jsonStart);
+          const parsed = tryParseJson(candidate);
+          if (parsed) {
+            finalJson = parsed;
+            log('Received final JSON result: %s', finalJson.result);
+            continue;
+          } else {
+            // JSON might span multiple lines — start collecting
+            collectingJson = true;
+            jsonBuffer = candidate;
+            continue;
           }
         }
-        emit('step_update', update);
-      } else {
-        log('SSH output: %s', trimmed);
+
+        if (collectingJson) {
+          jsonBuffer += trimmed;
+          const parsed = tryParseJson(jsonBuffer);
+          if (parsed) {
+            finalJson = parsed;
+            collectingJson = false;
+            log('Received final JSON result (multi-line): %s', finalJson.result);
+            continue;
+          }
+          // keep collecting
+          continue;
+        }
+
+        // Parse progress
+        const update = parseProgressLine(trimmed);
+        if (update) {
+          log('Step %d: %s — %s', update.stepNumber, update.message, update.status);
+          if (update.status === 'in_progress') {
+            stepTimers.set(update.stepNumber, Date.now());
+          } else if (update.status === 'pass' || update.status === 'fail') {
+            const startTime = stepTimers.get(update.stepNumber);
+            if (startTime) {
+              update.duration = (Date.now() - startTime) / 1000;
+            }
+          }
+          emit('step_update', update);
+        } else {
+          log('SSH output: %s', trimmed);
+        }
       }
     };
 
     const installPromise = conn.execStream(
       command,
-      (data: string) => {
-        for (const line of data.split('\n')) {
-          processLine(line.trim());
-        }
-      },
-      (data: string) => {
-        for (const line of data.split('\n')) {
-          processLine(line.trim());
-        }
-      }
+      (data: string) => processData(data),
+      (data: string) => processData(data)
     );
 
     const exitCode = await Promise.race([installPromise, timeoutPromise]);
     log('Install script exited with code: %d', exitCode);
+
+    // Fallback: scan allOutput for JSON if not already found
+    if (!finalJson) {
+      log('JSON not found during streaming, scanning full output...');
+      const jsonMatch = allOutput.match(/\{[^{}]*"operation"[^{}]*"steps"\s*:\s*\[[\s\S]*?\]\s*\}/);
+      if (jsonMatch) {
+        const parsed = tryParseJson(jsonMatch[0]);
+        if (parsed) {
+          finalJson = parsed;
+          log('Extracted JSON from full output: %s', finalJson.result);
+        }
+      }
+    }
 
     if (finalJson) {
       emit('install_complete', finalJson);
       return finalJson;
     }
 
-    log('No JSON result received from script');
+    log('No JSON result received from script (output length: %d)', allOutput.length);
     const result: InstallResult = {
       operation: 'install',
       image: settings.firmwareImage,
