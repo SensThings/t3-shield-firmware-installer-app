@@ -15,6 +15,8 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
   const [showToken, setShowToken] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [testingGhcr, setTestingGhcr] = useState(false);
+  const [ghcrResult, setGhcrResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const update = (key: keyof Settings, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -42,6 +44,28 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
     }
   };
 
+  const handleTestGhcr = async () => {
+    setTestingGhcr(true);
+    setGhcrResult(null);
+    try {
+      const res = await fetch('/api/settings/test-ghcr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: form.ghcrUsername,
+          token: form.ghcrToken,
+          image: form.firmwareImage,
+        }),
+      });
+      const data = await res.json();
+      setGhcrResult(data);
+    } catch {
+      setGhcrResult({ success: false, message: 'Request failed' });
+    } finally {
+      setTestingGhcr(false);
+    }
+  };
+
   const handleSave = () => {
     onSave(form);
     onClose();
@@ -50,7 +74,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
       <div
-        className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg p-6 shadow-2xl"
+        className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">
@@ -126,6 +150,21 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
               </button>
             </div>
             <Field label="Firmware Image" value={form.firmwareImage} onChange={v => update('firmwareImage', v)} />
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={handleTestGhcr}
+                disabled={testingGhcr || !form.ghcrUsername || !form.ghcrToken}
+                className="px-3 py-1.5 text-sm bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 rounded-md transition-colors"
+              >
+                {testingGhcr ? 'Testing...' : 'Test GHCR'}
+              </button>
+              {ghcrResult && (
+                <span className={`text-sm ${ghcrResult.success ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {ghcrResult.success ? '\u2713' : '\u2717'} {ghcrResult.message}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

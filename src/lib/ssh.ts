@@ -76,12 +76,16 @@ export async function connectSSH(config: {
 
   const uploadFile = (content: string, remotePath: string): Promise<void> => {
     return new Promise((resolve, reject) => {
-      const escaped = content.replace(/'/g, "'\\''");
-      client.exec(`cat > ${remotePath} << 'INSTALL_SCRIPT_EOF'\n${escaped}\nINSTALL_SCRIPT_EOF`, (err, stream) => {
+      // Use base64 encoding to avoid shell quoting issues
+      const b64 = Buffer.from(content).toString('base64');
+      const cmd = `echo '${b64}' | base64 -d > ${remotePath}`;
+      client.exec(cmd, (err, stream) => {
         if (err) return reject(err);
+        let stderr = '';
+        stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
         stream.on('close', (code: number) => {
           if (code === 0) resolve();
-          else reject(new Error(`Upload failed with code ${code}`));
+          else reject(new Error(`Upload failed (code ${code}): ${stderr}`));
         });
         stream.on('error', reject);
       });
