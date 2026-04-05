@@ -95,6 +95,9 @@ export async function runInstall(
 
     if (abortSignal?.aborted) throw new Error('Installation aborted');
 
+    // Derive gateway IP from device IP (replace last octet with 1)
+    const gatewayIp = settings.deviceIp.replace(/\.\d+$/, '.1');
+
     // Build command
     const envVars = [
       settings.ghcrUsername ? `GHCR_USER=${settings.ghcrUsername}` : '',
@@ -102,8 +105,8 @@ export async function runInstall(
       settings.firmwareImage ? `IMAGE=${settings.firmwareImage}` : '',
     ].filter(Boolean).join(' ');
 
-    const command = `sudo ${envVars} bash /tmp/install.sh --hostname ${hostname} --json 2>&1`;
-    log('Executing: sudo [GHCR_USER=...] [GHCR_TOKEN=...] bash /tmp/install.sh --hostname %s --json', hostname);
+    const command = `sudo ${envVars} bash /tmp/install.sh --hostname ${hostname} --gateway ${gatewayIp} --json 2>&1`;
+    log('Executing install.sh --hostname %s --gateway %s --json', hostname, gatewayIp);
 
     let finalJson: InstallResult | null = null;
     let jsonBuffer = '';
