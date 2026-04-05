@@ -568,16 +568,17 @@ step_pull()  { docker pull "$IMAGE" >/dev/null 2>&1 && echo "Image pulled" || { 
 step_stop()  { docker stop "$CONTAINER_NAME" >/dev/null 2>&1; docker rm "$CONTAINER_NAME" >/dev/null 2>&1; echo "Old container removed"; return 0; }
 step_start() {
     local cid; cid=$(docker run -d --name "$CONTAINER_NAME" --privileged --network host \
+        -v /dev/bus/usb:/dev/bus/usb \
         -v /data/logs:/app/logs -v /data/config.json:/app/config.json -v /data/scan_results:/app/scan_results \
         --restart unless-stopped "$IMAGE" 2>&1)
     [[ $? -eq 0 ]] && echo "Container started" || { echo "Start failed: $cid"; return 1; }
 }
 step_health() {
-    for i in $(seq 1 30); do
+    for i in $(seq 1 60); do
         if curl -sf http://localhost:5000/api/system/ping >/dev/null 2>&1; then echo "Healthy"; return 0; fi
         sleep 2
     done
-    echo "Health check timed out after 60s"; return 1
+    echo "Health check timed out after 120s"; return 1
 }
 step_warmup() {
     curl -sf -X POST http://localhost:5000/api/sdr/warmup >/dev/null 2>&1 && echo "SDR warmup triggered" || { echo "SDR warmup failed"; return 1; }
@@ -632,6 +633,7 @@ step_start_container() {
         --name "$CONTAINER_NAME" \
         --privileged \
         --network host \
+        -v /dev/bus/usb:/dev/bus/usb \
         -v /data/logs:/app/logs \
         -v /data/config.json:/app/config.json \
         -v /data/scan_results:/app/scan_results \
@@ -649,14 +651,14 @@ step_start_container() {
 }
 
 step_health_check() {
-    for i in $(seq 1 30); do
+    for i in $(seq 1 60); do
         if curl -sf http://localhost:5000/api/system/ping >/dev/null 2>&1; then
             echo "Healthy"
             return 0
         fi
         sleep 2
     done
-    echo "Health check timed out after 60s"
+    echo "Health check timed out after 120s"
     return 1
 }
 
