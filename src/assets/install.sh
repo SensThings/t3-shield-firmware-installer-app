@@ -284,7 +284,7 @@ Wants=network-online.target
 
 [Service]
 Type=notify
-ExecStart=/usr/local/bin/dockerd --containerd=/run/containerd/containerd.sock
+ExecStart=/usr/local/bin/dockerd --containerd=/run/containerd/containerd.sock --iptables=false
 ExecReload=/bin/kill -s HUP $MAINPID
 Restart=always
 RestartSec=5
