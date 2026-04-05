@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runInstall } from '@/lib/installer';
 import { Settings, StepUpdateEvent, InstallResult } from '@/lib/types';
 
+function log(msg: string, ...args: unknown[]) {
+  console.log(`[api/install] ${msg}`, ...args);
+}
+
 // In-memory store for active installations
 const activeInstalls = new Map<string, {
   events: Array<{ type: string; data: unknown; timestamp: number }>;
@@ -30,6 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const installId = `${serialNumber}-${Date.now()}`;
+    log('Starting install %s for serial %s', installId, serialNumber);
 
     activeInstalls.set(installId, {
       events: [],
@@ -55,10 +60,13 @@ export async function POST(request: NextRequest) {
         }
       }
     ).catch((err) => {
+      const errMsg = err instanceof Error ? err.message : 'Unknown error';
+      log('Install %s failed: %s', installId, errMsg);
       const install = activeInstalls.get(installId);
       if (install && install.status === 'running') {
         install.status = 'failed';
-        install.error = err instanceof Error ? err.message : 'Unknown error';
+        install.error = errMsg;
+        install.events.push({ type: 'install_error', data: { error: errMsg }, timestamp: Date.now() });
       }
     });
 
