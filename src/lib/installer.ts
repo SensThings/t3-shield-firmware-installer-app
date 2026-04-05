@@ -112,9 +112,9 @@ export async function runInstall(
     let allOutput = ''; // collect everything for fallback JSON extraction
 
     // Set up timeout
-    const timeoutMs = 5 * 60 * 1000;
+    const timeoutMs = 15 * 60 * 1000; // 15 minutes — Docker install on fresh Pi can take 10+
     const timeoutPromise = new Promise<never>((_, reject) => {
-      const timer = setTimeout(() => reject(new Error('Installation timed out after 5 minutes')), timeoutMs);
+      const timer = setTimeout(() => reject(new Error('Installation timed out after 15 minutes')), timeoutMs);
       if (abortSignal) {
         abortSignal.addEventListener('abort', () => {
           clearTimeout(timer);
