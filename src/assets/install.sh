@@ -5,16 +5,23 @@
 # Run on a FRESH Dragon OS Pi via SSH from the desktop install panel.
 #
 # Usage:
-#   GHCR_USER=<user> GHCR_TOKEN=<pat> bash install.sh [--json] [--hostname T3S-12345] [--gateway 192.168.137.1]
-#   # --json:     output structured JSON result (for mobile app / installer panel)
-#   # --hostname: set device hostname (e.g., T3S-<serial>) — optional
-#   # --gateway:  configure default route + DNS via this gateway IP — for Ethernet-only
-#                 Pi with no internet. Desktop shares internet via ICS.
-#   # Without --json: human-readable output (for manual use)
+#   # ONLINE mode (Pi has internet):
+#   GHCR_USER=<user> GHCR_TOKEN=<pat> bash install.sh [--json] [--hostname T3S-12345]
+#
+#   # OFFLINE mode (Pi has NO internet — image pushed via SCP):
+#   bash install.sh --image-tar /tmp/firmware.tar [--json] [--hostname T3S-12345]
+#
+# Flags:
+#   --json:       structured JSON result (stdout=JSON, stderr=progress)
+#   --hostname:   set device hostname (e.g., T3S-<serial>)
+#   --image-tar:  path to pre-transferred Docker image tar (offline mode)
+#                 When set: skips network config, registry login, and docker pull.
+#                 Uses `docker load` instead.
+#   --gateway:    configure default route + DNS (online mode only)
 #
 # Environment variables (or CLI args):
-#   GHCR_USER   — GitHub username for ghcr.io login
-#   GHCR_TOKEN  — GitHub PAT with read:packages scope
+#   GHCR_USER   — GitHub username for ghcr.io login (not needed in offline mode)
+#   GHCR_TOKEN  — GitHub PAT with read:packages scope (not needed in offline mode)
 #   IMAGE       — (optional) Full image ref (default: ghcr.io/sensthings/t3shield-firmware:latest)
 # =============================================================================
 
@@ -28,6 +35,7 @@ OPT_DIR="/opt/t3shield"
 JSON_MODE=false
 DEVICE_HOSTNAME=""
 GATEWAY_IP=""
+IMAGE_TAR=""
 RESULT_FILE="/tmp/t3shield-install-result.json"
 
 # ── Parse CLI args ───────────────────────────────────────────────────────────
@@ -37,16 +45,26 @@ while [[ $# -gt 0 ]]; do
         --ghcr-token) GHCR_TOKEN="$2"; shift 2 ;;
         --image)      IMAGE="$2";          shift 2 ;;
         --hostname)   DEVICE_HOSTNAME="$2"; shift 2 ;;
-        --gateway)    GATEWAY_IP="$2";     shift 2 ;;
-        --json)       JSON_MODE=true;      shift ;;
+        --gateway)    GATEWAY_IP="$2";       shift 2 ;;
+        --image-tar)  IMAGE_TAR="$2";       shift 2 ;;
+        --json)       JSON_MODE=true;        shift ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
 
-# ── Validate credentials ────────────────────────────────────────────────────
-if [[ -z "${GHCR_USER:-}" || -z "${GHCR_TOKEN:-}" ]]; then
-    echo "ERROR: GHCR_USER and GHCR_TOKEN must be set" >&2
-    exit 1
+# ── Validate inputs ──────────────────────────────────────────────────────────
+if [[ -n "$IMAGE_TAR" ]]; then
+    # Offline mode — validate tar exists
+    if [[ ! -f "$IMAGE_TAR" ]]; then
+        echo "ERROR: --image-tar file not found: $IMAGE_TAR" >&2
+        exit 1
+    fi
+else
+    # Online mode — need GHCR credentials
+    if [[ -z "${GHCR_USER:-}" || -z "${GHCR_TOKEN:-}" ]]; then
+        echo "ERROR: GHCR_USER and GHCR_TOKEN must be set (or use --image-tar for offline mode)" >&2
+        exit 1
+    fi
 fi
 
 # ── JSON Step Runner ─────────────────────────────────────────────────────────
@@ -191,13 +209,19 @@ step_set_hostname() {
 }
 
 step_configure_network() {
+    # In offline mode, no internet needed
+    if [[ -n "$IMAGE_TAR" ]]; then
+        echo "Offline mode — no internet required"
+        return 0
+    fi
+
     if [[ -z "$GATEWAY_IP" ]]; then
         # No gateway specified — check if we already have internet
         if curl -sf --connect-timeout 5 https://get.docker.com >/dev/null 2>&1; then
             echo "Internet already available"
             return 0
         fi
-        echo "No internet and no --gateway provided. Pi needs internet to install Docker."
+        echo "No internet and no --gateway provided. Use --image-tar for offline install."
         return 1
     fi
 
@@ -237,12 +261,86 @@ step_docker_install() {
         echo "Docker already installed"
         return 0
     fi
-    curl -fsSL https://get.docker.com 2>/dev/null | sh >/dev/null 2>&1
-    if command -v docker &>/dev/null; then
-        systemctl enable docker >/dev/null 2>&1
+
+    # Method 1: Online install (Pi has internet)
+    if curl -sf --connect-timeout 5 https://get.docker.com >/dev/null 2>&1; then
+        curl -fsSL https://get.docker.com 2>/dev/null | sh >/dev/null 2>&1
+
+    # Method 2: Offline install from static binaries (SCPed by installer app)
+    elif [[ -f /tmp/docker-static/docker/dockerd ]]; then
+        # Copy binaries to /usr/local/bin
+        cp /tmp/docker-static/docker/* /usr/local/bin/ 2>&1
+        chmod +x /usr/local/bin/docker* /usr/local/bin/containerd* /usr/local/bin/runc /usr/local/bin/ctr 2>/dev/null
+
+        # Create docker group
+        groupadd -f docker 2>/dev/null
+
+        # Create systemd service for dockerd
+        cat > /etc/systemd/system/docker.service <<'SVCEOF'
+[Unit]
+Description=Docker Application Container Engine
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/dockerd --containerd=/run/containerd/containerd.sock
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=5
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+Delegate=yes
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+        # Create containerd service
+        cat > /etc/systemd/system/containerd.service <<'CTDEOF'
+[Unit]
+Description=containerd container runtime
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/containerd
+Restart=always
+RestartSec=5
+Delegate=yes
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
+CTDEOF
+
+        systemctl daemon-reload
+        systemctl enable containerd docker >/dev/null 2>&1
+        systemctl start containerd >/dev/null 2>&1
+        sleep 2
         systemctl start docker >/dev/null 2>&1
+    else
+        echo "No internet and no Docker binaries at /tmp/docker-static/. Cannot install Docker."
+        return 1
+    fi
+
+    # Verify Docker is working
+    sleep 2
+    if command -v docker &>/dev/null && docker info >/dev/null 2>&1; then
         echo "Docker installed"
         return 0
+    elif command -v docker &>/dev/null; then
+        # Docker binary exists but daemon might still be starting
+        for i in $(seq 1 5); do
+            sleep 2
+            if docker info >/dev/null 2>&1; then
+                echo "Docker installed"
+                return 0
+            fi
+        done
+        echo "Docker installed but daemon not responding"
+        return 1
     else
         echo "Docker installation failed"
         return 1
@@ -301,6 +399,10 @@ CONFIGEOF
 }
 
 step_registry_login() {
+    if [[ -n "$IMAGE_TAR" ]]; then
+        echo "Skipped (offline mode)"
+        return 0
+    fi
     local output
     output=$(echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin 2>&1)
     local rc=$?
@@ -314,6 +416,21 @@ step_registry_login() {
 }
 
 step_pull_image() {
+    if [[ -n "$IMAGE_TAR" ]]; then
+        # Offline mode: load from tar
+        local output
+        output=$(docker load -i "$IMAGE_TAR" 2>&1)
+        local rc=$?
+        if [[ $rc -eq 0 ]]; then
+            echo "Image loaded from tar"
+            return 0
+        else
+            echo "Failed to load image: $output"
+            return 1
+        fi
+    fi
+
+    # Online mode: pull from registry
     local output
     output=$(docker pull "$IMAGE" 2>&1)
     local rc=$?

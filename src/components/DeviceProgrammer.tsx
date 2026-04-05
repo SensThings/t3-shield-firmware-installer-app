@@ -1,10 +1,17 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings, InstallStep, INSTALL_STEPS, StepUpdateEvent, InstallResult } from '@/lib/types';
+import { Settings, StepStatus, InstallStep, INSTALL_STEPS, PREP_STEPS, StepUpdateEvent, PrepStepEvent, InstallResult } from '@/lib/types';
 import ProgressChecklist from './ProgressChecklist';
 
 type View = 'idle' | 'serial_input' | 'programming' | 'success' | 'failure';
+
+interface PrepStep {
+  id: string;
+  label: string;
+  status: StepStatus;
+  message?: string;
+}
 
 interface DeviceProgrammerProps {
   settings: Settings;
@@ -13,6 +20,7 @@ interface DeviceProgrammerProps {
 export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
   const [view, setView] = useState<View>('idle');
   const [serialNumber, setSerialNumber] = useState('');
+  const [prepSteps, setPrepSteps] = useState<PrepStep[]>([]);
   const [steps, setSteps] = useState<InstallStep[]>([]);
   const [startTime, setStartTime] = useState(0);
   const [result, setResult] = useState<InstallResult | null>(null);
@@ -27,6 +35,9 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
     }
   }, [view]);
 
+  const initPrepSteps = (): PrepStep[] =>
+    PREP_STEPS.map(s => ({ id: s.id, label: s.label, status: 'pending' as const }));
+
   const initSteps = (): InstallStep[] =>
     INSTALL_STEPS.map((s, i) => ({
       id: s.id,
@@ -34,6 +45,14 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
       label: s.label,
       status: 'pending',
     }));
+
+  const handlePrepStep = useCallback((update: PrepStepEvent) => {
+    setPrepSteps(prev => prev.map(s =>
+      s.id === update.stepId
+        ? { ...s, status: update.status, message: update.message }
+        : s
+    ));
+  }, []);
 
   const handleStepUpdate = useCallback((update: StepUpdateEvent) => {
     setSteps(prev => {
@@ -47,7 +66,6 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
           duration: update.duration,
           startedAt: update.status === 'in_progress' ? Date.now() : next[idx].startedAt,
         };
-        // If a step fails, mark remaining as skipped
         if (update.status === 'fail') {
           for (let i = idx + 1; i < next.length; i++) {
             if (next[i].status === 'pending') {
@@ -64,6 +82,7 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
     const trimmed = serialNumber.trim();
     if (!trimmed || !/^[a-zA-Z0-9]{3,}$/.test(trimmed)) return;
 
+    setPrepSteps(initPrepSteps());
     setSteps(initSteps());
     setStartTime(Date.now());
     setResult(null);
@@ -84,13 +103,14 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
         return;
       }
 
-      // Listen to SSE stream
       const evtSource = new EventSource(`/api/install?installId=${data.installId}`);
 
       evtSource.onmessage = (event) => {
         try {
           const parsed = JSON.parse(event.data);
-          if (parsed.type === 'step_update') {
+          if (parsed.type === 'prep_step') {
+            handlePrepStep(parsed.data as PrepStepEvent);
+          } else if (parsed.type === 'step_update') {
             handleStepUpdate(parsed.data as StepUpdateEvent);
           } else if (parsed.type === 'install_complete') {
             const installResult = parsed.data as InstallResult;
@@ -112,13 +132,11 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
             evtSource.close();
           }
         } catch {
-          // ignore parse errors
+          // ignore
         }
       };
 
-      evtSource.onerror = () => {
-        evtSource.close();
-      };
+      evtSource.onerror = () => evtSource.close();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start installation');
       setView('failure');
@@ -133,16 +151,15 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
   const reset = () => {
     setView('idle');
     setSerialNumber('');
+    setPrepSteps([]);
     setSteps([]);
     setResult(null);
     setError('');
   };
 
-  const retry = () => {
-    setView('serial_input');
-  };
+  const retry = () => setView('serial_input');
 
-  // Idle view — big "Program New Device" button
+  // Idle view
   if (view === 'idle') {
     return (
       <div className="flex flex-col items-center justify-center flex-1 gap-6">
@@ -165,64 +182,88 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
     );
   }
 
-  // Serial number input modal
+  // Serial number input
   if (view === 'serial_input') {
     const isValid = /^[a-zA-Z0-9]{3,}$/.test(serialNumber.trim());
     return (
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-40" onClick={() => setView('idle')}>
-        <div
-          className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6 shadow-2xl"
-          onClick={e => e.stopPropagation()}
-        >
+        <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
           <h2 className="text-lg font-semibold text-zinc-100 mb-4">Enter Device Serial Number</h2>
-
           <div className="mb-4">
-            <input
-              ref={serialInputRef}
-              type="text"
-              value={serialNumber}
-              onChange={e => setSerialNumber(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="e.g. 12345"
-              className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200 text-lg placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-            />
+            <input ref={serialInputRef} type="text" value={serialNumber} onChange={e => setSerialNumber(e.target.value)} onKeyDown={handleKeyDown} placeholder="e.g. 12345"
+              className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200 text-lg placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" />
             {serialNumber.trim() && (
-              <p className="text-sm text-zinc-500 mt-2">
-                Hostname will be: <span className="text-zinc-300 font-mono">T3S-{serialNumber.trim()}</span>
-              </p>
+              <p className="text-sm text-zinc-500 mt-2">Hostname will be: <span className="text-zinc-300 font-mono">T3S-{serialNumber.trim()}</span></p>
             )}
             {serialNumber.trim() && !isValid && (
-              <p className="text-sm text-red-400 mt-1">
-                Must be alphanumeric, at least 3 characters.
-              </p>
+              <p className="text-sm text-red-400 mt-1">Must be alphanumeric, at least 3 characters.</p>
             )}
           </div>
-
           <div className="flex justify-end gap-3">
-            <button
-              onClick={() => setView('idle')}
-              className="px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={startInstall}
-              disabled={!isValid}
-              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-            >
-              Start
-            </button>
+            <button onClick={() => setView('idle')} className="px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors">Cancel</button>
+            <button onClick={startInstall} disabled={!isValid} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors">Start</button>
           </div>
         </div>
       </div>
     );
   }
 
-  // Programming progress view
+  // Programming progress view — shows both prep and install steps
   if (view === 'programming') {
+    const allPrepDone = prepSteps.every(s => s.status === 'pass');
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-8">
-        <ProgressChecklist steps={steps} serialNumber={serialNumber.trim()} startTime={startTime} />
+        <div className="w-full max-w-xl">
+          {/* Prep phase */}
+          {!allPrepDone && (
+            <div className="mb-6">
+              <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Preparing Files</h3>
+              <div className="space-y-1">
+                {prepSteps.map(s => (
+                  <div key={s.id} className={`flex items-center gap-3 py-2 px-3 rounded-lg ${s.status === 'in_progress' ? 'bg-zinc-800/50' : ''}`}>
+                    <div className="flex-shrink-0">
+                      {s.status === 'pending' && <div className="w-4 h-4 rounded-full border-2 border-zinc-700" />}
+                      {s.status === 'in_progress' && (
+                        <svg className="w-4 h-4 animate-spin text-amber-500" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      )}
+                      {s.status === 'pass' && (
+                        <svg className="w-4 h-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                      {s.status === 'fail' && (
+                        <svg className="w-4 h-4 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-sm ${s.status === 'pending' ? 'text-zinc-600' : 'text-zinc-300'}`}>{s.label}</span>
+                      {s.message && s.status !== 'pending' && (
+                        <p className="text-xs text-zinc-500 mt-0.5">{s.message}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Install phase */}
+          {allPrepDone && (
+            <ProgressChecklist steps={steps} serialNumber={serialNumber.trim()} startTime={startTime} />
+          )}
+
+          {/* Show both when prep is done but install hasn't started */}
+          {!allPrepDone && prepSteps.some(s => s.status !== 'pending') && (
+            <div className="mt-4 text-center text-sm text-zinc-500">
+              Preparing files for transfer...
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -238,17 +279,10 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
           <h2 className="text-xl font-semibold text-zinc-100 mb-4">Device programmed successfully!</h2>
           <div className="space-y-2 text-sm text-zinc-400 mb-6">
             <p>Hostname: <span className="text-zinc-200 font-mono">T3S-{serialNumber.trim()}</span></p>
-            {result?.version && (
-              <p>Firmware: <span className="text-zinc-200">{result.version}</span></p>
-            )}
-            {result?.image && (
-              <p>Image: <span className="text-zinc-200 font-mono text-xs">{result.image}</span></p>
-            )}
+            {result?.version && <p>Firmware: <span className="text-zinc-200">{result.version}</span></p>}
+            {result?.image && <p>Image: <span className="text-zinc-200 font-mono text-xs">{result.image}</span></p>}
           </div>
-          <button
-            onClick={reset}
-            className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors"
-          >
+          <button onClick={reset} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors">
             Program Another Device
           </button>
         </div>
@@ -259,6 +293,7 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
   // Failure view
   if (view === 'failure') {
     const failedStep = steps.find(s => s.status === 'fail');
+    const failedPrep = prepSteps.find(s => s.status === 'fail');
     return (
       <div className="flex flex-col items-center justify-center flex-1 gap-6">
         <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-8 text-center max-w-md">
@@ -266,27 +301,17 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
           </svg>
           <h2 className="text-xl font-semibold text-zinc-100 mb-2">Programming failed</h2>
-          {failedStep && (
+          {(failedStep || failedPrep) && (
             <p className="text-sm text-zinc-400 mb-1">
-              Failed at: <span className="text-red-400">{failedStep.label}</span>
+              Failed at: <span className="text-red-400">{failedStep?.label || failedPrep?.label}</span>
             </p>
           )}
           <p className="text-sm text-red-400/80 mb-6">
-            {error || failedStep?.message || 'Unknown error'}
+            {error || failedStep?.message || failedPrep?.message || 'Unknown error'}
           </p>
           <div className="flex justify-center gap-3">
-            <button
-              onClick={retry}
-              className="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-lg font-medium transition-colors"
-            >
-              Retry
-            </button>
-            <button
-              onClick={reset}
-              className="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-lg font-medium transition-colors"
-            >
-              Program Another
-            </button>
+            <button onClick={retry} className="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-lg font-medium transition-colors">Retry</button>
+            <button onClick={reset} className="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-lg font-medium transition-colors">Program Another</button>
           </div>
         </div>
       </div>
