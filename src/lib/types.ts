@@ -1,0 +1,81 @@
+export interface Settings {
+  deviceIp: string;
+  sshUsername: string;
+  sshPassword: string;
+  ghcrUsername: string;
+  ghcrToken: string;
+  firmwareImage: string;
+}
+
+export const DEFAULT_SETTINGS: Settings = {
+  deviceIp: '192.168.137.100',
+  sshUsername: 'sensthings',
+  sshPassword: 'Sensthings@012',
+  ghcrUsername: '',
+  ghcrToken: '',
+  firmwareImage: 'ghcr.io/sensthings/t3shield-firmware:latest',
+};
+
+export type StepStatus = 'pending' | 'in_progress' | 'pass' | 'fail' | 'skipped';
+
+export interface InstallStep {
+  id: string;
+  number: number;
+  label: string;
+  status: StepStatus;
+  message?: string;
+  duration?: number;
+  startedAt?: number;
+}
+
+export const INSTALL_STEPS: { id: string; label: string }[] = [
+  { id: 'set_hostname', label: 'Set device hostname' },
+  { id: 'docker_install', label: 'Install Docker' },
+  { id: 'create_dirs', label: 'Create data directories' },
+  { id: 'write_config', label: 'Write default config' },
+  { id: 'registry_login', label: 'Login to registry' },
+  { id: 'pull_image', label: 'Pull firmware image' },
+  { id: 'install_update_script', label: 'Install update script' },
+  { id: 'start_container', label: 'Start container' },
+  { id: 'health_check', label: 'Health check' },
+  { id: 'sdr_warmup', label: 'SDR warmup' },
+  { id: 'sdr_verify', label: 'Verify SDR status' },
+];
+
+export interface InstallResult {
+  operation: string;
+  result: 'pass' | 'fail';
+  hostname?: string;
+  firmware_version?: string;
+  sdr_status?: string;
+  error?: string;
+  failed_step?: string;
+  steps: {
+    id: string;
+    label: string;
+    result: 'pass' | 'fail' | 'skipped';
+    message?: string;
+    duration_ms?: number;
+  }[];
+}
+
+export interface StepUpdateEvent {
+  stepNumber: number;
+  status: StepStatus;
+  message?: string;
+  duration?: number;
+}
+
+export interface InstallCompleteEvent {
+  result: InstallResult;
+}
+
+export interface InstallErrorEvent {
+  error: string;
+}
+
+export interface TestConnectionResult {
+  success: boolean;
+  message: string;
+  latencyMs?: number;
+}
