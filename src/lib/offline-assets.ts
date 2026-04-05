@@ -107,6 +107,13 @@ export async function prepareFirmwareImage(
     log('Cache tag mismatch: cached=%s, requested=%s', cachedTag, image);
   }
 
+  // Check docker is available on desktop
+  try {
+    execSync('docker --version', { stdio: 'pipe' });
+  } catch {
+    throw new Error('Docker is not installed on this machine. Install Docker Desktop and try again.');
+  }
+
   // Login to GHCR
   log('Logging in to ghcr.io...');
   onProgress?.('Logging in to container registry...');
@@ -115,8 +122,8 @@ export async function prepareFirmwareImage(
       stdio: 'pipe',
       timeout: 30000,
     });
-  } catch (err) {
-    throw new Error(`GHCR login failed: ${err instanceof Error ? err.message : err}`);
+  } catch {
+    throw new Error('GHCR login failed — check username and token in Settings');
   }
 
   // Pull image for ARM64
@@ -127,8 +134,8 @@ export async function prepareFirmwareImage(
       stdio: 'pipe',
       timeout: 10 * 60 * 1000,
     });
-  } catch (err) {
-    throw new Error(`Docker pull failed: ${err instanceof Error ? err.message : err}`);
+  } catch {
+    throw new Error(`Failed to pull firmware image. Check that the image exists and GHCR credentials are correct.`);
   }
 
   // Save to tar
@@ -139,8 +146,8 @@ export async function prepareFirmwareImage(
       stdio: 'pipe',
       timeout: 5 * 60 * 1000,
     });
-  } catch (err) {
-    throw new Error(`Docker save failed: ${err instanceof Error ? err.message : err}`);
+  } catch {
+    throw new Error('Failed to save firmware image to disk');
   }
 
   // Write version tag
