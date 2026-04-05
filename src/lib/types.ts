@@ -38,6 +38,7 @@ export const PREP_STEPS: { id: string; label: string }[] = [
 
 export const INSTALL_STEPS: { id: string; label: string }[] = [
   { id: 'set_hostname', label: 'Set device hostname' },
+  { id: 'expand_partition', label: 'Expand SD card partition' },
   { id: 'configure_network', label: 'Configure network' },
   { id: 'docker_install', label: 'Install Docker' },
   { id: 'create_dirs', label: 'Create data directories' },

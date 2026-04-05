@@ -73,7 +73,7 @@ fi
 STEPS_JSON="[]"
 OPERATION_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 FAILED=false
-TOTAL_STEPS=12
+TOTAL_STEPS=13
 
 log() {
     # Human-readable output goes to stderr so it doesn't pollute JSON on stdout
@@ -206,6 +206,58 @@ step_set_hostname() {
         echo "Failed to set hostname"
         return 1
     fi
+}
+
+step_expand_partition() {
+    # Expand root partition (partition 2) to fill the entire SD card.
+    # Dragon OS ships with a 14.3GB root on a 64GB card — wastes ~44GB.
+    # Must happen before Docker install since /var/lib/docker needs space.
+
+    local disk="/dev/mmcblk0"
+    local part="${disk}p2"
+
+    # Check if the disk exists (we're on a Pi with SD card)
+    if [[ ! -b "$disk" ]]; then
+        echo "Skipped (no SD card at $disk)"
+        return 0
+    fi
+
+    # Check current vs total size — skip if already within 95% of full
+    local part_size_kb total_size_kb
+    part_size_kb=$(df --output=size "$part" 2>/dev/null | tail -1 | tr -d ' ')
+    total_size_kb=$(lsblk -bno SIZE "$disk" 2>/dev/null | head -1)
+    if [[ -n "$part_size_kb" && -n "$total_size_kb" ]]; then
+        total_size_kb=$((total_size_kb / 1024))
+        # If partition is already >90% of disk, skip
+        if (( part_size_kb * 100 / total_size_kb > 90 )); then
+            echo "Partition already expanded ($(( part_size_kb / 1024 / 1024 ))GB)"
+            return 0
+        fi
+    fi
+
+    # Resize partition using parted (available on Dragon OS, growpart is not)
+    parted "$disk" ---pretend-input-tty resizepart 2 100% Yes >/dev/null 2>&1
+    local rc=$?
+
+    if [[ $rc -ne 0 ]]; then
+        echo "parted resizepart failed (exit $rc)"
+        return 1
+    fi
+
+    # Resize filesystem to fill the expanded partition
+    resize2fs "$part" >/dev/null 2>&1
+    rc=$?
+
+    if [[ $rc -ne 0 ]]; then
+        echo "resize2fs failed (exit $rc)"
+        return 1
+    fi
+
+    # Report new size
+    local new_size_gb
+    new_size_gb=$(df -BG --output=size "$part" 2>/dev/null | tail -1 | tr -d ' G')
+    echo "Partition expanded to ${new_size_gb}GB"
+    return 0
 }
 
 step_configure_network() {
@@ -644,17 +696,18 @@ log "====================================="
 log "Image: $IMAGE"
 
 run_step 1  "set_hostname"          "Set device hostname"      step_set_hostname
-run_step 2  "configure_network"    "Configure network"        step_configure_network
-run_step 3  "docker_install"        "Install Docker"           step_docker_install
-run_step 4  "create_dirs"           "Create data directories"  step_create_dirs
-run_step 5  "write_config"          "Write default config"     step_write_config
-run_step 6  "registry_login"        "Login to registry"        step_registry_login
-run_step 7  "pull_image"            "Pull firmware image"      step_pull_image
-run_step 8  "install_update_script" "Install update script"    step_install_update_script
-run_step 9  "start_container"       "Start container"          step_start_container
-run_step 10 "health_check"          "Health check"             step_health_check
-run_step 11 "sdr_warmup"            "SDR warmup"               step_sdr_warmup
-run_step 12 "sdr_verify"            "Verify SDR status"        step_sdr_verify
+run_step 2  "expand_partition"     "Expand SD card partition" step_expand_partition
+run_step 3  "configure_network"    "Configure network"        step_configure_network
+run_step 4  "docker_install"        "Install Docker"           step_docker_install
+run_step 5  "create_dirs"           "Create data directories"  step_create_dirs
+run_step 6  "write_config"          "Write default config"     step_write_config
+run_step 7  "registry_login"        "Login to registry"        step_registry_login
+run_step 8  "pull_image"            "Pull firmware image"      step_pull_image
+run_step 9  "install_update_script" "Install update script"    step_install_update_script
+run_step 10 "start_container"       "Start container"          step_start_container
+run_step 11 "health_check"          "Health check"             step_health_check
+run_step 12 "sdr_warmup"            "SDR warmup"               step_sdr_warmup
+run_step 13 "sdr_verify"            "Verify SDR status"        step_sdr_verify
 
 emit_result
 
