@@ -30,6 +30,7 @@ export interface InstallStep {
 
 export const INSTALL_STEPS: { id: string; label: string }[] = [
   { id: 'set_hostname', label: 'Set device hostname' },
+  { id: 'configure_network', label: 'Configure network' },
   { id: 'docker_install', label: 'Install Docker' },
   { id: 'create_dirs', label: 'Create data directories' },
   { id: 'write_config', label: 'Write default config' },

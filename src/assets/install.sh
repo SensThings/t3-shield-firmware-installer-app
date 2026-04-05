@@ -5,9 +5,11 @@
 # Run on a FRESH Dragon OS Pi via SSH from the desktop install panel.
 #
 # Usage:
-#   GHCR_USER=<user> GHCR_TOKEN=<pat> bash install.sh [--json] [--hostname T3S-12345]
+#   GHCR_USER=<user> GHCR_TOKEN=<pat> bash install.sh [--json] [--hostname T3S-12345] [--gateway 192.168.137.1]
 #   # --json:     output structured JSON result (for mobile app / installer panel)
 #   # --hostname: set device hostname (e.g., T3S-<serial>) — optional
+#   # --gateway:  configure default route + DNS via this gateway IP — for Ethernet-only
+#                 Pi with no internet. Desktop shares internet via ICS.
 #   # Without --json: human-readable output (for manual use)
 #
 # Environment variables (or CLI args):
@@ -25,6 +27,7 @@ DATA_DIR="/data"
 OPT_DIR="/opt/t3shield"
 JSON_MODE=false
 DEVICE_HOSTNAME=""
+GATEWAY_IP=""
 RESULT_FILE="/tmp/t3shield-install-result.json"
 
 # ── Parse CLI args ───────────────────────────────────────────────────────────
@@ -34,6 +37,7 @@ while [[ $# -gt 0 ]]; do
         --ghcr-token) GHCR_TOKEN="$2"; shift 2 ;;
         --image)      IMAGE="$2";          shift 2 ;;
         --hostname)   DEVICE_HOSTNAME="$2"; shift 2 ;;
+        --gateway)    GATEWAY_IP="$2";     shift 2 ;;
         --json)       JSON_MODE=true;      shift ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
@@ -51,7 +55,7 @@ fi
 STEPS_JSON="[]"
 OPERATION_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 FAILED=false
-TOTAL_STEPS=11
+TOTAL_STEPS=12
 
 log() {
     # Human-readable output goes to stderr so it doesn't pollute JSON on stdout
@@ -184,6 +188,48 @@ step_set_hostname() {
         echo "Failed to set hostname"
         return 1
     fi
+}
+
+step_configure_network() {
+    if [[ -z "$GATEWAY_IP" ]]; then
+        # No gateway specified — check if we already have internet
+        if curl -sf --connect-timeout 5 https://get.docker.com >/dev/null 2>&1; then
+            echo "Internet already available"
+            return 0
+        fi
+        echo "No internet and no --gateway provided. Pi needs internet to install Docker."
+        return 1
+    fi
+
+    # Find the active Ethernet interface (usually eth0)
+    local eth_iface
+    eth_iface=$(ip -o link show | grep -E 'eth[0-9]|enp|ens' | grep 'state UP' | head -1 | awk -F: '{print $2}' | tr -d ' ')
+    if [[ -z "$eth_iface" ]]; then
+        eth_iface="eth0"
+    fi
+
+    # Add default route via gateway
+    ip route replace default via "$GATEWAY_IP" dev "$eth_iface" 2>/dev/null
+
+    # Set DNS (use gateway as DNS if it's a NAT router, plus Google DNS as fallback)
+    cat > /etc/resolv.conf <<DNSEOF
+nameserver $GATEWAY_IP
+nameserver 8.8.8.8
+nameserver 8.8.4.4
+DNSEOF
+
+    # Verify internet connectivity
+    local retries=3
+    for i in $(seq 1 $retries); do
+        if curl -sf --connect-timeout 5 https://get.docker.com >/dev/null 2>&1; then
+            echo "Network configured via $GATEWAY_IP"
+            return 0
+        fi
+        sleep 1
+    done
+
+    echo "Network configured but cannot reach internet via $GATEWAY_IP"
+    return 1
 }
 
 step_docker_install() {
@@ -481,16 +527,17 @@ log "====================================="
 log "Image: $IMAGE"
 
 run_step 1  "set_hostname"          "Set device hostname"      step_set_hostname
-run_step 2  "docker_install"        "Install Docker"           step_docker_install
-run_step 3  "create_dirs"           "Create data directories"  step_create_dirs
-run_step 4  "write_config"          "Write default config"     step_write_config
-run_step 5  "registry_login"        "Login to registry"        step_registry_login
-run_step 6  "pull_image"            "Pull firmware image"      step_pull_image
-run_step 7  "install_update_script" "Install update script"    step_install_update_script
-run_step 8  "start_container"       "Start container"          step_start_container
-run_step 9  "health_check"          "Health check"             step_health_check
-run_step 10 "sdr_warmup"            "SDR warmup"               step_sdr_warmup
-run_step 11 "sdr_verify"            "Verify SDR status"        step_sdr_verify
+run_step 2  "configure_network"    "Configure network"        step_configure_network
+run_step 3  "docker_install"        "Install Docker"           step_docker_install
+run_step 4  "create_dirs"           "Create data directories"  step_create_dirs
+run_step 5  "write_config"          "Write default config"     step_write_config
+run_step 6  "registry_login"        "Login to registry"        step_registry_login
+run_step 7  "pull_image"            "Pull firmware image"      step_pull_image
+run_step 8  "install_update_script" "Install update script"    step_install_update_script
+run_step 9  "start_container"       "Start container"          step_start_container
+run_step 10 "health_check"          "Health check"             step_health_check
+run_step 11 "sdr_warmup"            "SDR warmup"               step_sdr_warmup
+run_step 12 "sdr_verify"            "Verify SDR status"        step_sdr_verify
 
 emit_result
 
