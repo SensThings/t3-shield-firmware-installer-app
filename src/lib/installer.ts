@@ -195,9 +195,15 @@ export async function runInstall(
 
     if (abortSignal?.aborted) throw new Error('Installation aborted');
 
-    // Upload Docker static binaries
+    // Upload Docker static binaries — skip if Docker is already installed on Pi
     const paths = getCachePaths();
-    await uploadDirectory(conn, paths.dockerDir, '/tmp/docker-static', 'Docker binaries', emit, 'upload_docker');
+    const dockerCheck = await conn.exec('command -v docker 2>/dev/null && docker --version 2>/dev/null');
+    if (dockerCheck.code === 0 && dockerCheck.stdout.includes('Docker')) {
+      log('Docker already on Pi (%s), skipping binaries upload', dockerCheck.stdout.trim().split('\n').pop());
+      emit('prep_step', { stepId: 'upload_docker', status: 'pass', message: 'Docker already installed on device' });
+    } else {
+      await uploadDirectory(conn, paths.dockerDir, '/tmp/docker-static', 'Docker binaries', emit, 'upload_docker');
+    }
 
     if (abortSignal?.aborted) throw new Error('Installation aborted');
 
