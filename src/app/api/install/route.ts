@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runInstall } from '@/lib/installer';
-import { Settings, StepUpdateEvent, InstallResult } from '@/lib/types';
+import { Settings, StepUpdateEvent, PrepStepEvent, InstallResult } from '@/lib/types';
 
 function log(msg: string, ...args: unknown[]) {
   console.log(`[api/install] ${msg}`, ...args);
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     runInstall(
       serialNumber,
       settings,
-      (event: string, data: StepUpdateEvent | InstallResult | { error: string }) => {
+      (event: string, data: StepUpdateEvent | InstallResult | PrepStepEvent | { error: string }) => {
         const install = activeInstalls.get(installId);
         if (install) {
           install.events.push({ type: event, data, timestamp: Date.now() });

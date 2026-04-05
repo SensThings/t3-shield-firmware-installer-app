@@ -1,9 +1,11 @@
 import { connectSSH } from './ssh';
-import { Settings, StepUpdateEvent, InstallResult } from './types';
-import { readFileSync } from 'fs';
+import { Settings, StepUpdateEvent, InstallResult, PrepStepEvent } from './types';
+import { prepareDockerBinaries, prepareFirmwareImage, getCachePaths } from './offline-assets';
+import { readFileSync, statSync, createReadStream } from 'fs';
 import { join } from 'path';
+import { execSync } from 'child_process';
 
-type EmitFn = (event: string, data: StepUpdateEvent | InstallResult | { error: string }) => void;
+type EmitFn = (event: string, data: StepUpdateEvent | InstallResult | PrepStepEvent | { error: string }) => void;
 
 function log(msg: string, ...args: unknown[]) {
   console.log(`[installer] ${msg}`, ...args);
@@ -14,7 +16,6 @@ function logError(msg: string, ...args: unknown[]) {
 }
 
 function getInstallScript(): string {
-  // Try multiple paths (dev vs standalone build)
   const paths = [
     join(process.cwd(), 'src', 'assets', 'install.sh'),
     join(process.cwd(), 'assets', 'install.sh'),
@@ -24,40 +25,121 @@ function getInstallScript(): string {
       const content = readFileSync(p, 'utf-8');
       log('Loaded install.sh from %s (%d bytes)', p, content.length);
       return content;
-    } catch {
-      // try next
-    }
+    } catch { /* try next */ }
   }
   throw new Error('install.sh not found in any expected location');
 }
 
-// Parse progress lines like:
-//   [1/11] Set device hostname...           → in_progress
-//   [1/11] Set device hostname — PASS (msg) → pass
-//   [1/11] Set device hostname — FAIL: msg  → fail
-//   [1/11] Set device hostname — SKIPPED    → skipped
+// Parse progress lines: [N/12] label... / PASS / FAIL / SKIPPED
 function parseProgressLine(line: string): StepUpdateEvent | null {
   const passMatch = line.match(/\[(\d+)\/\d+\]\s+(.+?)\s+—\s+PASS\s*\((.+?)\)/);
   if (passMatch) {
     return { stepNumber: parseInt(passMatch[1]), status: 'pass', message: passMatch[3] };
   }
-
   const failMatch = line.match(/\[(\d+)\/\d+\]\s+(.+?)\s+—\s+FAIL:\s*(.*)/);
   if (failMatch) {
     return { stepNumber: parseInt(failMatch[1]), status: 'fail', message: failMatch[3] };
   }
-
   const skippedMatch = line.match(/\[(\d+)\/\d+\]\s+(.+?)\s+—\s+SKIPPED/);
   if (skippedMatch) {
     return { stepNumber: parseInt(skippedMatch[1]), status: 'skipped', message: 'Skipped' };
   }
-
   const progressMatch = line.match(/\[(\d+)\/\d+\]\s+(.+?)\.{3}/);
   if (progressMatch) {
     return { stepNumber: parseInt(progressMatch[1]), status: 'in_progress', message: progressMatch[2].trim() };
   }
-
   return null;
+}
+
+// Upload a large file via SFTP with progress logging
+async function uploadLargeFile(
+  conn: Awaited<ReturnType<typeof connectSSH>>,
+  localPath: string,
+  remotePath: string,
+  label: string,
+  emit: EmitFn,
+  prepStepId: string
+): Promise<void> {
+  const size = statSync(localPath).size;
+  const sizeMB = Math.round(size / 1024 / 1024);
+  log('Uploading %s: %s → %s (%dMB)', label, localPath, remotePath, sizeMB);
+  emit('prep_step', { stepId: prepStepId, status: 'in_progress', message: `Uploading ${label} (${sizeMB}MB)...` });
+
+  return new Promise((resolve, reject) => {
+    conn.client.sftp((err, sftp) => {
+      if (err) return reject(new Error(`SFTP init failed: ${err.message}`));
+
+      const readStream = createReadStream(localPath);
+      const writeStream = sftp.createWriteStream(remotePath);
+
+      let transferred = 0;
+      let lastLoggedPct = -10;
+
+      readStream.on('data', (chunk: string | Buffer) => {
+        transferred += chunk.length;
+        const pct = Math.round((transferred / size) * 100);
+        if (pct - lastLoggedPct >= 10) {
+          lastLoggedPct = pct;
+          log('  %s: %d%%', label, pct);
+          emit('prep_step', {
+            stepId: prepStepId,
+            status: 'in_progress',
+            message: `Uploading ${label} (${pct}%)...`,
+          });
+        }
+      });
+
+      writeStream.on('close', () => {
+        sftp.end();
+        log('Upload complete: %s', label);
+        emit('prep_step', { stepId: prepStepId, status: 'pass', message: `${label} uploaded (${sizeMB}MB)` });
+        resolve();
+      });
+
+      writeStream.on('error', (e: Error) => {
+        sftp.end();
+        reject(new Error(`Upload failed for ${label}: ${e.message}`));
+      });
+
+      readStream.pipe(writeStream);
+    });
+  });
+}
+
+// Upload a directory by tarring on desktop and untarring on Pi
+async function uploadDirectory(
+  conn: Awaited<ReturnType<typeof connectSSH>>,
+  localDir: string,
+  remoteDir: string,
+  label: string,
+  emit: EmitFn,
+  prepStepId: string
+): Promise<void> {
+  log('Uploading directory %s: %s → %s', label, localDir, remoteDir);
+  emit('prep_step', { stepId: prepStepId, status: 'in_progress', message: `Uploading ${label}...` });
+
+  // Create a tar on the desktop, upload it, extract on Pi
+  const tarPath = join(getCachePaths().cacheDir, 'docker-upload.tar.gz');
+  try {
+    execSync(`tar czf "${tarPath}" -C "${localDir}" .`, { stdio: 'pipe' });
+  } catch (err) {
+    throw new Error(`Failed to create tar: ${err instanceof Error ? err.message : err}`);
+  }
+
+  const size = statSync(tarPath).size;
+  const sizeMB = Math.round(size / 1024 / 1024);
+
+  // Upload tar
+  await uploadLargeFile(conn, tarPath, '/tmp/docker-static.tar.gz', label, emit, prepStepId);
+
+  // Extract on Pi
+  log('Extracting %s on Pi...', label);
+  const result = await conn.exec(`sudo mkdir -p ${remoteDir} && sudo tar xzf /tmp/docker-static.tar.gz -C ${remoteDir} && sudo rm /tmp/docker-static.tar.gz`);
+  if (result.code !== 0) {
+    throw new Error(`Failed to extract ${label} on Pi: ${result.stderr}`);
+  }
+
+  emit('prep_step', { stepId: prepStepId, status: 'pass', message: `${label} uploaded (${sizeMB}MB)` });
 }
 
 export async function runInstall(
@@ -69,9 +151,31 @@ export async function runInstall(
   const hostname = `T3S-${serialNumber}`;
   let conn;
 
-  log('Starting install for %s (host: %s)', hostname, settings.deviceIp);
+  log('Starting offline install for %s (host: %s)', hostname, settings.deviceIp);
 
   try {
+    // === PHASE 1: Prepare offline assets on desktop ===
+    log('=== Phase 1: Preparing offline assets ===');
+
+    emit('prep_step', { stepId: 'prepare_docker', status: 'in_progress', message: 'Checking Docker binaries cache...' });
+    await prepareDockerBinaries((msg) => {
+      emit('prep_step', { stepId: 'prepare_docker', status: 'in_progress', message: msg });
+    });
+    emit('prep_step', { stepId: 'prepare_docker', status: 'pass', message: 'Docker binaries ready' });
+
+    if (abortSignal?.aborted) throw new Error('Installation aborted');
+
+    emit('prep_step', { stepId: 'prepare_firmware', status: 'in_progress', message: 'Checking firmware image cache...' });
+    await prepareFirmwareImage(settings.firmwareImage, settings.ghcrUsername, settings.ghcrToken, (msg) => {
+      emit('prep_step', { stepId: 'prepare_firmware', status: 'in_progress', message: msg });
+    });
+    emit('prep_step', { stepId: 'prepare_firmware', status: 'pass', message: 'Firmware image ready' });
+
+    if (abortSignal?.aborted) throw new Error('Installation aborted');
+
+    // === PHASE 2: Connect and upload to Pi ===
+    log('=== Phase 2: Uploading files to Pi ===');
+
     log('Connecting via SSH to %s@%s...', settings.sshUsername, settings.deviceIp);
     conn = await connectSSH({
       host: settings.deviceIp,
@@ -81,41 +185,40 @@ export async function runInstall(
     });
     log('SSH connected');
 
-    if (abortSignal?.aborted) throw new Error('Installation aborted');
-
     // Upload install script
-    log('Uploading install.sh...');
+    emit('prep_step', { stepId: 'upload_script', status: 'in_progress', message: 'Uploading install script...' });
     const script = getInstallScript();
     await conn.uploadFile(script, '/tmp/install.sh');
-    log('Upload complete');
-
-    // Verify upload
     const verify = await conn.exec('wc -l /tmp/install.sh');
-    log('Uploaded file: %s', verify.stdout.trim());
+    log('Uploaded install.sh: %s', verify.stdout.trim());
+    emit('prep_step', { stepId: 'upload_script', status: 'pass', message: 'Install script uploaded' });
 
     if (abortSignal?.aborted) throw new Error('Installation aborted');
 
-    // Derive gateway IP from device IP (replace last octet with 1)
-    const gatewayIp = settings.deviceIp.replace(/\.\d+$/, '.1');
+    // Upload Docker static binaries
+    const paths = getCachePaths();
+    await uploadDirectory(conn, paths.dockerDir, '/tmp/docker-static', 'Docker binaries', emit, 'upload_docker');
 
-    // Build command
-    const envVars = [
-      settings.ghcrUsername ? `GHCR_USER=${settings.ghcrUsername}` : '',
-      settings.ghcrToken ? `GHCR_TOKEN=${settings.ghcrToken}` : '',
-      settings.firmwareImage ? `IMAGE=${settings.firmwareImage}` : '',
-    ].filter(Boolean).join(' ');
+    if (abortSignal?.aborted) throw new Error('Installation aborted');
 
-    const command = `sudo ${envVars} bash /tmp/install.sh --hostname ${hostname} --gateway ${gatewayIp} --json 2>&1`;
-    log('Executing install.sh --hostname %s --gateway %s --json', hostname, gatewayIp);
+    // Upload firmware tar
+    await uploadLargeFile(conn, paths.firmwareTar, '/tmp/firmware.tar', 'Firmware image', emit, 'upload_firmware');
+
+    if (abortSignal?.aborted) throw new Error('Installation aborted');
+
+    // === PHASE 3: Run install script in offline mode ===
+    log('=== Phase 3: Running install script ===');
+
+    const command = `sudo bash /tmp/install.sh --image-tar /tmp/firmware.tar --hostname ${hostname} --json 2>&1`;
+    log('Executing: %s', command.replace(/\/tmp\/firmware\.tar/, '/tmp/firmware.tar'));
 
     let finalJson: InstallResult | null = null;
     let jsonBuffer = '';
     let collectingJson = false;
     const stepTimers = new Map<number, number>();
-    let allOutput = ''; // collect everything for fallback JSON extraction
+    let allOutput = '';
 
-    // Set up timeout
-    const timeoutMs = 15 * 60 * 1000; // 15 minutes — Docker install on fresh Pi can take 10+
+    const timeoutMs = 15 * 60 * 1000;
     const timeoutPromise = new Promise<never>((_, reject) => {
       const timer = setTimeout(() => reject(new Error('Installation timed out after 15 minutes')), timeoutMs);
       if (abortSignal) {
@@ -126,7 +229,6 @@ export async function runInstall(
       }
     });
 
-    // Fix invalid JSON like "duration_s":.1 → "duration_s":0.1
     const fixJson = (str: string): string => str.replace(/:(\.\d)/g, ':0$1');
 
     const tryParseJson = (str: string): InstallResult | null => {
@@ -135,17 +237,13 @@ export async function runInstall(
         if (parsed && typeof parsed === 'object' && 'operation' in parsed) {
           return parsed as InstallResult;
         }
-      } catch {
-        // not valid JSON
-      }
+      } catch { /* not valid JSON */ }
       return null;
     };
 
     const processData = (data: string) => {
       allOutput += data;
 
-      // If we're collecting JSON, append raw data (not line-split)
-      // and try to parse before splitting into lines
       if (collectingJson) {
         jsonBuffer += data;
         const parsed = tryParseJson(jsonBuffer);
@@ -155,8 +253,6 @@ export async function runInstall(
           log('Received final JSON result (multi-chunk): %s', finalJson.result);
           return;
         }
-        // Check if we've gone past the JSON (hit non-JSON content)
-        // The JSON ends with }] } — if we see a newline after }, try to extract
         const lastBrace = jsonBuffer.lastIndexOf('}');
         if (lastBrace > 0) {
           const candidate = jsonBuffer.slice(0, lastBrace + 1);
@@ -165,12 +261,6 @@ export async function runInstall(
             finalJson = parsed2;
             collectingJson = false;
             log('Received final JSON result (trimmed): %s', finalJson.result);
-            // Process remaining data as normal lines
-            const remaining = jsonBuffer.slice(lastBrace + 1);
-            for (const line of remaining.split('\n')) {
-              const trimmed = line.trim();
-              if (trimmed) log('SSH output: %s', trimmed);
-            }
             return;
           }
         }
@@ -182,7 +272,6 @@ export async function runInstall(
         const trimmed = rawLine.trim();
         if (!trimmed) continue;
 
-        // Detect JSON start
         if (trimmed.includes('{') && trimmed.includes('"operation"')) {
           const jsonStart = trimmed.indexOf('{');
           const candidate = trimmed.slice(jsonStart);
@@ -192,7 +281,6 @@ export async function runInstall(
             log('Received final JSON result: %s', finalJson.result);
             continue;
           } else {
-            // JSON is split across chunks — collect raw data from here
             collectingJson = true;
             jsonBuffer = candidate;
             log('JSON started (%d chars), collecting...', candidate.length);
@@ -200,7 +288,6 @@ export async function runInstall(
           }
         }
 
-        // Parse progress
         const update = parseProgressLine(trimmed);
         if (update) {
           log('Step %d: %s — %s', update.stepNumber, update.message, update.status);
@@ -228,10 +315,9 @@ export async function runInstall(
     const exitCode = await Promise.race([installPromise, timeoutPromise]);
     log('Install script exited with code: %d', exitCode);
 
-    // Fallback: scan allOutput for JSON if not already found
+    // Fallback JSON extraction
     if (!finalJson) {
       log('JSON not found during streaming, scanning full output...');
-      // Find lines starting with { that contain "operation"
       for (const line of allOutput.split('\n')) {
         const trimmed = line.trim();
         if (trimmed.startsWith('{') && trimmed.includes('"operation"')) {
@@ -251,9 +337,6 @@ export async function runInstall(
     }
 
     log('No JSON result received from script (output length: %d)', allOutput.length);
-    log('=== RAW OUTPUT START ===');
-    log(allOutput);
-    log('=== RAW OUTPUT END ===');
     const result: InstallResult = {
       operation: 'install',
       image: settings.firmwareImage,

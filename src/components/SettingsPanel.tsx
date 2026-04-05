@@ -17,6 +17,8 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [testingGhcr, setTestingGhcr] = useState(false);
   const [ghcrResult, setGhcrResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshResult, setRefreshResult] = useState<string | null>(null);
 
   const update = (key: keyof Settings, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -151,7 +153,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
             </div>
             <Field label="Firmware Image" value={form.firmwareImage} onChange={v => update('firmwareImage', v)} />
 
-            <div className="flex items-center gap-3 pt-1">
+            <div className="flex items-center gap-3 pt-1 flex-wrap">
               <button
                 onClick={handleTestGhcr}
                 disabled={testingGhcr || !form.ghcrUsername || !form.ghcrToken}
@@ -159,10 +161,31 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
               >
                 {testingGhcr ? 'Testing...' : 'Test GHCR'}
               </button>
+              <button
+                onClick={async () => {
+                  setRefreshing(true);
+                  setRefreshResult(null);
+                  try {
+                    await fetch('/api/cache', { method: 'DELETE' });
+                    setRefreshResult('Cache cleared — will re-download on next install');
+                  } catch {
+                    setRefreshResult('Failed to clear cache');
+                  } finally {
+                    setRefreshing(false);
+                  }
+                }}
+                disabled={refreshing}
+                className="px-3 py-1.5 text-sm bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 rounded-md transition-colors"
+              >
+                {refreshing ? 'Clearing...' : 'Refresh Image'}
+              </button>
               {ghcrResult && (
                 <span className={`text-sm ${ghcrResult.success ? 'text-emerald-400' : 'text-red-400'}`}>
                   {ghcrResult.success ? '\u2713' : '\u2717'} {ghcrResult.message}
                 </span>
+              )}
+              {refreshResult && (
+                <span className="text-sm text-zinc-400">{refreshResult}</span>
               )}
             </div>
           </div>

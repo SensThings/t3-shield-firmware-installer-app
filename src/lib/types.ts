@@ -9,7 +9,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   deviceIp: '192.168.137.100',
-  sshUsername: 'sensthings',
+  sshUsername: 'dragon',
   sshPassword: 'Sensthings@012',
   ghcrUsername: '',
   ghcrToken: '',
@@ -27,6 +27,14 @@ export interface InstallStep {
   duration?: number;
   startedAt?: number;
 }
+
+export const PREP_STEPS: { id: string; label: string }[] = [
+  { id: 'prepare_docker', label: 'Prepare Docker binaries' },
+  { id: 'prepare_firmware', label: 'Prepare firmware image' },
+  { id: 'upload_script', label: 'Upload install script' },
+  { id: 'upload_docker', label: 'Upload Docker binaries' },
+  { id: 'upload_firmware', label: 'Upload firmware image' },
+];
 
 export const INSTALL_STEPS: { id: string; label: string }[] = [
   { id: 'set_hostname', label: 'Set device hostname' },
@@ -65,6 +73,18 @@ export interface StepUpdateEvent {
   status: StepStatus;
   message?: string;
   duration?: number;
+}
+
+export interface PrepStepEvent {
+  stepId: string;
+  status: StepStatus;
+  message?: string;
+}
+
+export interface CacheStatus {
+  dockerBinaries: boolean;
+  firmwareImage: boolean;
+  firmwareTag: string | null;
 }
 
 export interface InstallCompleteEvent {
