@@ -123,9 +123,12 @@ export async function runInstall(
       }
     });
 
+    // Fix invalid JSON like "duration_s":.1 → "duration_s":0.1
+    const fixJson = (str: string): string => str.replace(/:(\.\d)/g, ':0$1');
+
     const tryParseJson = (str: string): InstallResult | null => {
       try {
-        const parsed = JSON.parse(str);
+        const parsed = JSON.parse(fixJson(str));
         if (parsed && typeof parsed === 'object' && 'operation' in parsed) {
           return parsed as InstallResult;
         }
@@ -138,14 +141,46 @@ export async function runInstall(
     const processData = (data: string) => {
       allOutput += data;
 
+      // If we're collecting JSON, append raw data (not line-split)
+      // and try to parse before splitting into lines
+      if (collectingJson) {
+        jsonBuffer += data;
+        const parsed = tryParseJson(jsonBuffer);
+        if (parsed) {
+          finalJson = parsed;
+          collectingJson = false;
+          log('Received final JSON result (multi-chunk): %s', finalJson.result);
+          return;
+        }
+        // Check if we've gone past the JSON (hit non-JSON content)
+        // The JSON ends with }] } — if we see a newline after }, try to extract
+        const lastBrace = jsonBuffer.lastIndexOf('}');
+        if (lastBrace > 0) {
+          const candidate = jsonBuffer.slice(0, lastBrace + 1);
+          const parsed2 = tryParseJson(candidate);
+          if (parsed2) {
+            finalJson = parsed2;
+            collectingJson = false;
+            log('Received final JSON result (trimmed): %s', finalJson.result);
+            // Process remaining data as normal lines
+            const remaining = jsonBuffer.slice(lastBrace + 1);
+            for (const line of remaining.split('\n')) {
+              const trimmed = line.trim();
+              if (trimmed) log('SSH output: %s', trimmed);
+            }
+            return;
+          }
+        }
+        return;
+      }
+
       const lines = data.split('\n');
       for (const rawLine of lines) {
         const trimmed = rawLine.trim();
         if (!trimmed) continue;
 
-        // Try to extract JSON from any line containing a { character
+        // Detect JSON start
         if (trimmed.includes('{') && trimmed.includes('"operation"')) {
-          // Extract the JSON substring starting from the first {
           const jsonStart = trimmed.indexOf('{');
           const candidate = trimmed.slice(jsonStart);
           const parsed = tryParseJson(candidate);
@@ -154,24 +189,12 @@ export async function runInstall(
             log('Received final JSON result: %s', finalJson.result);
             continue;
           } else {
-            // JSON might span multiple lines — start collecting
+            // JSON is split across chunks — collect raw data from here
             collectingJson = true;
             jsonBuffer = candidate;
+            log('JSON started (%d chars), collecting...', candidate.length);
             continue;
           }
-        }
-
-        if (collectingJson) {
-          jsonBuffer += trimmed;
-          const parsed = tryParseJson(jsonBuffer);
-          if (parsed) {
-            finalJson = parsed;
-            collectingJson = false;
-            log('Received final JSON result (multi-line): %s', finalJson.result);
-            continue;
-          }
-          // keep collecting
-          continue;
         }
 
         // Parse progress
@@ -205,12 +228,16 @@ export async function runInstall(
     // Fallback: scan allOutput for JSON if not already found
     if (!finalJson) {
       log('JSON not found during streaming, scanning full output...');
-      const jsonMatch = allOutput.match(/\{[^{}]*"operation"[^{}]*"steps"\s*:\s*\[[\s\S]*?\]\s*\}/);
-      if (jsonMatch) {
-        const parsed = tryParseJson(jsonMatch[0]);
-        if (parsed) {
-          finalJson = parsed;
-          log('Extracted JSON from full output: %s', finalJson.result);
+      // Find lines starting with { that contain "operation"
+      for (const line of allOutput.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('{') && trimmed.includes('"operation"')) {
+          const parsed = tryParseJson(trimmed);
+          if (parsed) {
+            finalJson = parsed;
+            log('Extracted JSON from full output: %s', finalJson.result);
+            break;
+          }
         }
       }
     }
@@ -221,6 +248,9 @@ export async function runInstall(
     }
 
     log('No JSON result received from script (output length: %d)', allOutput.length);
+    log('=== RAW OUTPUT START ===');
+    log(allOutput);
+    log('=== RAW OUTPUT END ===');
     const result: InstallResult = {
       operation: 'install',
       image: settings.firmwareImage,
