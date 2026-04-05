@@ -22,7 +22,7 @@ export default function Home() {
 
   return (
     <>
-      <Header onSettingsClick={() => setShowSettings(true)} deviceIp={settings.deviceIp} />
+      <Header onSettingsClick={() => setShowSettings(true)} settings={settings} />
       <main className="flex-1 flex">
         <DeviceProgrammer settings={settings} />
       </main>

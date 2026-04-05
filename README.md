@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# T3-Shield Firmware Installer App
 
-## Getting Started
+Desktop web app for programming new Raspberry Pi devices with T3-Shield firmware. Technicians connect a fresh Pi via Ethernet, enter a serial number, click Start, and the app handles everything via SSH.
 
-First, run the development server:
+## Quick Start
+
+### Docker (recommended)
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker run -d --name t3shield-installer --network host \
+  ghcr.io/sensthings/t3-shield-firmware-installer-app:latest
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run dev
+```
 
-## Learn More
+## Usage
 
-To learn more about Next.js, take a look at the following resources:
+1. Connect a Raspberry Pi via Ethernet (default IP: `192.168.137.100`)
+2. Configure GHCR credentials in Settings (gear icon)
+3. Click **Program New Device**
+4. Enter the device serial number
+5. Watch real-time progress as the firmware is installed
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Configuration
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Access settings via the gear icon in the header:
 
-## Deploy on Vercel
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Device IP | `192.168.137.100` | Pi's Ethernet IP |
+| SSH Username | `sensthings` | SSH login user |
+| SSH Password | `Sensthings@012` | SSH login password |
+| GHCR Username | *(required)* | GitHub username for container registry |
+| GHCR Token | *(required)* | GitHub PAT with `read:packages` scope |
+| Firmware Image | `ghcr.io/sensthings/t3shield-firmware:latest` | Docker image to pull |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Install Steps
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The firmware installation runs 11 steps on the Pi:
+
+1. Set device hostname (T3S-\<serial\>)
+2. Install Docker
+3. Create data directories
+4. Write default config
+5. Login to container registry
+6. Pull firmware image
+7. Install update script
+8. Start container
+9. Health check
+10. SDR warmup
+11. Verify SDR status
+
+## Tech Stack
+
+- **Frontend:** Next.js 16 (App Router), React, Tailwind CSS
+- **Backend:** Next.js API routes with SSE streaming
+- **SSH:** `ssh2` npm package
+- **Container:** Docker with standalone Next.js output
