@@ -76,18 +76,19 @@ export async function connectSSH(config: {
 
   const uploadFile = (content: string, remotePath: string): Promise<void> => {
     return new Promise((resolve, reject) => {
-      // Use base64 encoding to avoid shell quoting issues
-      const b64 = Buffer.from(content).toString('base64');
-      const cmd = `echo '${b64}' | base64 -d > ${remotePath}`;
-      client.exec(cmd, (err, stream) => {
-        if (err) return reject(err);
-        let stderr = '';
-        stream.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
-        stream.on('close', (code: number) => {
-          if (code === 0) resolve();
-          else reject(new Error(`Upload failed (code ${code}): ${stderr}`));
+      client.sftp((err, sftp) => {
+        if (err) return reject(new Error(`SFTP init failed: ${err.message}`));
+        const writeStream = sftp.createWriteStream(remotePath);
+        writeStream.on('close', () => {
+          sftp.end();
+          resolve();
         });
-        stream.on('error', reject);
+        writeStream.on('error', (e: Error) => {
+          sftp.end();
+          reject(new Error(`SFTP write failed: ${e.message}`));
+        });
+        writeStream.write(content);
+        writeStream.end();
       });
     });
   };
