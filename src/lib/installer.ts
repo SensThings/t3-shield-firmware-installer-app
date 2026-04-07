@@ -1,4 +1,4 @@
-import { connectSSH } from './ssh';
+import { connectSSH, connectViaProxy } from './ssh';
 import { Settings, StepUpdateEvent, InstallResult, PrepStepEvent } from './types';
 import { prepareDockerBinaries, prepareFirmwareImage, getCachePaths } from './offline-assets';
 import { readFileSync, statSync, createReadStream } from 'fs';
@@ -149,9 +149,11 @@ export async function runInstall(
   abortSignal?: AbortSignal
 ): Promise<InstallResult> {
   const hostname = `T3S-${serialNumber}`;
-  let conn;
+  let conn: Awaited<ReturnType<typeof connectSSH>> | null = null;
+  let closeAll: (() => void) | null = null;
+  const useProxy = !!settings.desktopIp;
 
-  log('Starting offline install for %s (host: %s)', hostname, settings.deviceIp);
+  log('Starting offline install for %s (host: %s, via: %s)', hostname, settings.deviceIp, useProxy ? settings.desktopIp : 'direct');
 
   try {
     // === PHASE 1: Prepare offline assets on desktop ===
@@ -176,14 +178,30 @@ export async function runInstall(
     // === PHASE 2: Connect and upload to Pi ===
     log('=== Phase 2: Uploading files to Pi ===');
 
-    log('Connecting via SSH to %s@%s...', settings.sshUsername, settings.deviceIp);
-    conn = await connectSSH({
-      host: settings.deviceIp,
-      username: settings.sshUsername,
-      password: settings.sshPassword,
-      timeout: 10000,
-    });
-    log('SSH connected');
+    if (useProxy) {
+      log('Connecting via ProxyJump: server → %s → %s', settings.desktopIp, settings.deviceIp);
+      const proxy = await connectViaProxy({
+        jumpHost: settings.desktopIp,
+        jumpUsername: settings.desktopSshUsername,
+        jumpPassword: settings.desktopSshPassword,
+        targetHost: settings.deviceIp,
+        targetUsername: settings.sshUsername,
+        targetPassword: settings.sshPassword,
+        timeout: 10000,
+      });
+      conn = proxy.target;
+      closeAll = proxy.closeAll;
+      log('SSH connected via %s', settings.desktopIp);
+    } else {
+      log('Connecting directly to %s@%s...', settings.sshUsername, settings.deviceIp);
+      conn = await connectSSH({
+        host: settings.deviceIp,
+        username: settings.sshUsername,
+        password: settings.sshPassword,
+        timeout: 10000,
+      });
+      log('SSH connected');
+    }
 
     // Upload install script
     emit('prep_step', { stepId: 'upload_script', status: 'in_progress', message: 'Uploading install script...' });
@@ -368,7 +386,11 @@ export async function runInstall(
     emit('install_error', { error: errorMsg });
     throw new Error(errorMsg);
   } finally {
-    conn?.close();
+    if (closeAll) {
+      closeAll();
+    } else {
+      conn?.close();
+    }
     log('SSH connection closed');
   }
 }
