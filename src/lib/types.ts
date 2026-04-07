@@ -82,6 +82,19 @@ export interface PrepStepEvent {
   message?: string;
 }
 
+// SDR Test
+export const SDR_PREP_STEPS: { id: string; label: string }[] = [
+  { id: 'check_desktop_sdr', label: 'Check desktop SDR' },
+  { id: 'upload_test_scripts', label: 'Upload test scripts' },
+  { id: 'start_transmitter', label: 'Start transmitter' },
+];
+
+export const SDR_TEST_STEPS: { id: string; label: string }[] = [
+  { id: 'init_receiver', label: 'Initialize SDR receiver' },
+  { id: 'run_test', label: 'Capture and analyze RF' },
+  { id: 'validate_results', label: 'Validate results' },
+];
+
 export interface CacheStatus {
   dockerBinaries: boolean;
   firmwareImage: boolean;
