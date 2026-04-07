@@ -155,6 +155,8 @@ export async function runInstall(
 
   log('Starting offline install for %s (host: %s, via: %s)', hostname, settings.deviceIp, useProxy ? settings.desktopIp : 'direct');
 
+  const paths = getCachePaths();
+
   try {
     // === PHASE 1: Prepare offline assets on desktop ===
     log('=== Phase 1: Preparing offline assets ===');
@@ -178,7 +180,39 @@ export async function runInstall(
     // === PHASE 2: Connect and upload to Pi ===
     log('=== Phase 2: Uploading files to Pi ===');
 
+    let desktopConn: Awaited<ReturnType<typeof connectSSH>> | null = null;
+
     if (useProxy) {
+      // Connect to desktop first
+      log('Connecting to desktop %s...', settings.desktopIp);
+      desktopConn = await connectSSH({
+        host: settings.desktopIp,
+        username: settings.desktopSshUsername,
+        password: settings.desktopSshPassword,
+        timeout: 10000,
+      });
+      log('Desktop connected');
+
+      // Cache firmware.tar on desktop (server → desktop over WiFi, once)
+      // Then desktop → Pi is fast Ethernet for every subsequent device
+      const desktopCacheDir = '/tmp/t3s-cache';
+      const desktopFirmwarePath = `${desktopCacheDir}/firmware.tar`;
+      await desktopConn.exec(`mkdir -p ${desktopCacheDir}`);
+
+      const desktopCacheCheck = await desktopConn.exec(`[ -f ${desktopFirmwarePath} ] && stat -c%s ${desktopFirmwarePath} 2>/dev/null || echo 0`);
+      const desktopCacheSize = parseInt(desktopCacheCheck.stdout.trim()) || 0;
+      const localSize = statSync(paths.firmwareTar).size;
+
+      if (desktopCacheSize === localSize) {
+        log('Firmware already cached on desktop (%dMB)', Math.round(localSize / 1024 / 1024));
+        emit('prep_step', { stepId: 'upload_firmware', status: 'pass', message: `Firmware cached on desktop (${Math.round(localSize / 1024 / 1024)}MB)` });
+      } else {
+        log('Uploading firmware to desktop cache (server → desktop WiFi)...');
+        emit('prep_step', { stepId: 'upload_firmware', status: 'in_progress', message: 'Caching firmware on desktop (first time)...' });
+        await uploadLargeFile(desktopConn, paths.firmwareTar, desktopFirmwarePath, 'Firmware to desktop', emit, 'upload_firmware');
+      }
+
+      // Connect to Pi via ProxyJump
       log('Connecting via ProxyJump: server → %s → %s', settings.desktopIp, settings.deviceIp);
       const proxy = await connectViaProxy({
         jumpHost: settings.desktopIp,
@@ -191,8 +225,44 @@ export async function runInstall(
       });
       conn = proxy.target;
       closeAll = proxy.closeAll;
-      log('SSH connected via %s', settings.desktopIp);
+      log('SSH connected to Pi via %s', settings.desktopIp);
+
+      // Upload install script to Pi (small, via tunnel is fine)
+      emit('prep_step', { stepId: 'upload_script', status: 'in_progress', message: 'Uploading install script...' });
+      const script = getInstallScript();
+      await conn.uploadFile(script, '/tmp/install.sh');
+      log('Uploaded install.sh to Pi');
+      emit('prep_step', { stepId: 'upload_script', status: 'pass', message: 'Install script uploaded' });
+
+      if (abortSignal?.aborted) throw new Error('Installation aborted');
+
+      // Upload Docker binaries — skip if already on Pi
+      const dockerCheck = await conn.exec('command -v docker 2>/dev/null && docker --version 2>/dev/null');
+      if (dockerCheck.code === 0 && dockerCheck.stdout.includes('Docker')) {
+        log('Docker already on Pi, skipping');
+        emit('prep_step', { stepId: 'upload_docker', status: 'pass', message: 'Docker already installed on device' });
+      } else {
+        await uploadDirectory(conn, paths.dockerDir, '/tmp/docker-static', 'Docker binaries', emit, 'upload_docker');
+      }
+
+      if (abortSignal?.aborted) throw new Error('Installation aborted');
+
+      // Copy firmware from desktop cache to Pi (fast Ethernet, desktop → Pi)
+      log('Copying firmware from desktop cache to Pi (fast Ethernet)...');
+      emit('prep_step', { stepId: 'upload_firmware', status: 'in_progress', message: 'Transferring firmware to device (Ethernet)...' });
+      const scpResult = await desktopConn.exec(
+        `sshpass -p '${settings.sshPassword}' scp -o StrictHostKeyChecking=no ${desktopFirmwarePath} ${settings.sshUsername}@${settings.deviceIp}:/tmp/firmware.tar 2>&1`
+      );
+      if (scpResult.code !== 0) {
+        // Fallback: check if sshpass is available, if not try expect or direct
+        log('scp via desktop failed (%s), falling back to tunnel upload', scpResult.stderr.trim());
+        await uploadLargeFile(conn, paths.firmwareTar, '/tmp/firmware.tar', 'Firmware image', emit, 'upload_firmware');
+      } else {
+        log('Firmware copied from desktop to Pi via Ethernet');
+        emit('prep_step', { stepId: 'upload_firmware', status: 'pass', message: 'Firmware transferred via Ethernet' });
+      }
     } else {
+      // Direct mode — no desktop proxy
       log('Connecting directly to %s@%s...', settings.sshUsername, settings.deviceIp);
       conn = await connectSSH({
         host: settings.deviceIp,
@@ -201,32 +271,30 @@ export async function runInstall(
         timeout: 10000,
       });
       log('SSH connected');
+
+      // Upload install script
+      emit('prep_step', { stepId: 'upload_script', status: 'in_progress', message: 'Uploading install script...' });
+      const script = getInstallScript();
+      await conn.uploadFile(script, '/tmp/install.sh');
+      log('Uploaded install.sh');
+      emit('prep_step', { stepId: 'upload_script', status: 'pass', message: 'Install script uploaded' });
+
+      if (abortSignal?.aborted) throw new Error('Installation aborted');
+
+      // Upload Docker binaries — skip if already on Pi
+      const dockerCheck = await conn.exec('command -v docker 2>/dev/null && docker --version 2>/dev/null');
+      if (dockerCheck.code === 0 && dockerCheck.stdout.includes('Docker')) {
+        log('Docker already on Pi, skipping');
+        emit('prep_step', { stepId: 'upload_docker', status: 'pass', message: 'Docker already installed on device' });
+      } else {
+        await uploadDirectory(conn, paths.dockerDir, '/tmp/docker-static', 'Docker binaries', emit, 'upload_docker');
+      }
+
+      if (abortSignal?.aborted) throw new Error('Installation aborted');
+
+      // Upload firmware tar directly
+      await uploadLargeFile(conn, paths.firmwareTar, '/tmp/firmware.tar', 'Firmware image', emit, 'upload_firmware');
     }
-
-    // Upload install script
-    emit('prep_step', { stepId: 'upload_script', status: 'in_progress', message: 'Uploading install script...' });
-    const script = getInstallScript();
-    await conn.uploadFile(script, '/tmp/install.sh');
-    const verify = await conn.exec('wc -l /tmp/install.sh');
-    log('Uploaded install.sh: %s', verify.stdout.trim());
-    emit('prep_step', { stepId: 'upload_script', status: 'pass', message: 'Install script uploaded' });
-
-    if (abortSignal?.aborted) throw new Error('Installation aborted');
-
-    // Upload Docker static binaries — skip if Docker is already installed on Pi
-    const paths = getCachePaths();
-    const dockerCheck = await conn.exec('command -v docker 2>/dev/null && docker --version 2>/dev/null');
-    if (dockerCheck.code === 0 && dockerCheck.stdout.includes('Docker')) {
-      log('Docker already on Pi (%s), skipping binaries upload', dockerCheck.stdout.trim().split('\n').pop());
-      emit('prep_step', { stepId: 'upload_docker', status: 'pass', message: 'Docker already installed on device' });
-    } else {
-      await uploadDirectory(conn, paths.dockerDir, '/tmp/docker-static', 'Docker binaries', emit, 'upload_docker');
-    }
-
-    if (abortSignal?.aborted) throw new Error('Installation aborted');
-
-    // Upload firmware tar
-    await uploadLargeFile(conn, paths.firmwareTar, '/tmp/firmware.tar', 'Firmware image', emit, 'upload_firmware');
 
     if (abortSignal?.aborted) throw new Error('Installation aborted');
 

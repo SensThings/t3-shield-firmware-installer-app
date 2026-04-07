@@ -24,6 +24,7 @@ export function getCachePaths() {
     dockerDir: join(CACHE_DIR, 'docker-static'),
     firmwareTar: join(CACHE_DIR, 'firmware.tar'),
     firmwareVersion: join(CACHE_DIR, 'firmware-version.txt'),
+    firmwareDigest: join(CACHE_DIR, 'firmware-digest.txt'),
   };
 }
 
@@ -44,14 +45,12 @@ export async function prepareDockerBinaries(
   ensureCacheDir();
   const paths = getCachePaths();
 
-  // Check if already extracted
   if (existsSync(join(paths.dockerDir, 'docker', 'dockerd'))) {
     log('Docker binaries already cached');
     onProgress?.('Docker binaries cached');
     return paths.dockerDir;
   }
 
-  // Check if tgz already downloaded
   if (!existsSync(paths.dockerTgz)) {
     log('Downloading Docker static binaries from %s', DOCKER_STATIC_URL);
     onProgress?.('Downloading Docker binaries (60MB)...');
@@ -67,7 +66,6 @@ export async function prepareDockerBinaries(
     }
   }
 
-  // Extract
   log('Extracting Docker binaries...');
   onProgress?.('Extracting Docker binaries...');
   mkdirSync(paths.dockerDir, { recursive: true });
@@ -86,6 +84,22 @@ export async function prepareDockerBinaries(
   return paths.dockerDir;
 }
 
+/**
+ * Get the remote digest for an image without pulling it.
+ * Uses `docker manifest inspect` which only fetches metadata.
+ */
+function getRemoteDigest(image: string): string | null {
+  try {
+    const output = execSync(
+      `docker manifest inspect "${image}" 2>/dev/null | grep -o '"digest":"[^"]*"' | head -1 | cut -d'"' -f4`,
+      { stdio: 'pipe', timeout: 30000 }
+    ).toString().trim();
+    return output || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function prepareFirmwareImage(
   image: string,
   ghcrUsername: string,
@@ -95,26 +109,14 @@ export async function prepareFirmwareImage(
   ensureCacheDir();
   const paths = getCachePaths();
 
-  // Check if already cached with same tag
-  if (existsSync(paths.firmwareTar) && existsSync(paths.firmwareVersion)) {
-    const cachedTag = readFileSync(paths.firmwareVersion, 'utf-8').trim();
-    if (cachedTag === image) {
-      const size = statSync(paths.firmwareTar).size;
-      log('Firmware image already cached: %s (%dMB)', image, Math.round(size / 1024 / 1024));
-      onProgress?.(`Firmware image cached (${Math.round(size / 1024 / 1024)}MB)`);
-      return paths.firmwareTar;
-    }
-    log('Cache tag mismatch: cached=%s, requested=%s', cachedTag, image);
-  }
-
-  // Check docker is available on desktop
+  // Check docker is available
   try {
     execSync('docker --version', { stdio: 'pipe' });
   } catch {
-    throw new Error('Docker is not installed on this machine. Install Docker Desktop and try again.');
+    throw new Error('Docker is not installed on this machine. Install Docker and try again.');
   }
 
-  // Login to GHCR
+  // Login to GHCR (needed for digest check + pull)
   log('Logging in to ghcr.io...');
   onProgress?.('Logging in to container registry...');
   try {
@@ -126,17 +128,44 @@ export async function prepareFirmwareImage(
     throw new Error('GHCR login failed — check username and token in Settings');
   }
 
+  // Check if cache is up to date by comparing digests
+  if (existsSync(paths.firmwareTar) && existsSync(paths.firmwareDigest)) {
+    const cachedDigest = readFileSync(paths.firmwareDigest, 'utf-8').trim();
+    onProgress?.('Checking for firmware updates...');
+    const remoteDigest = getRemoteDigest(image);
+
+    if (remoteDigest && cachedDigest === remoteDigest) {
+      const size = statSync(paths.firmwareTar).size;
+      log('Firmware cache is up to date: %s (%dMB)', remoteDigest, Math.round(size / 1024 / 1024));
+      onProgress?.(`Firmware image up to date (${Math.round(size / 1024 / 1024)}MB)`);
+      return paths.firmwareTar;
+    }
+
+    if (remoteDigest) {
+      log('Firmware update available: cached=%s, remote=%s', cachedDigest, remoteDigest);
+      onProgress?.('New firmware version available, pulling...');
+    } else {
+      log('Could not check remote digest, using cache');
+      const size = statSync(paths.firmwareTar).size;
+      onProgress?.(`Using cached firmware (${Math.round(size / 1024 / 1024)}MB)`);
+      return paths.firmwareTar;
+    }
+  }
+
   // Pull image for ARM64
   log('Pulling firmware image: %s', image);
-  onProgress?.(`Pulling firmware image (this may take a few minutes)...`);
+  onProgress?.('Pulling firmware image (this may take a few minutes)...');
   try {
     execSync(`docker pull --platform linux/arm64 "${image}"`, {
       stdio: 'pipe',
       timeout: 10 * 60 * 1000,
     });
   } catch {
-    throw new Error(`Failed to pull firmware image. Check that the image exists and GHCR credentials are correct.`);
+    throw new Error('Failed to pull firmware image. Check that the image exists and GHCR credentials are correct.');
   }
+
+  // Get the digest of what we just pulled
+  const digest = getRemoteDigest(image);
 
   // Save to tar
   log('Saving firmware image to tar...');
@@ -150,11 +179,14 @@ export async function prepareFirmwareImage(
     throw new Error('Failed to save firmware image to disk');
   }
 
-  // Write version tag
+  // Write version tag + digest
   writeFileSync(paths.firmwareVersion, image);
+  if (digest) {
+    writeFileSync(paths.firmwareDigest, digest);
+  }
 
   const size = statSync(paths.firmwareTar).size;
-  log('Firmware image saved: %dMB', Math.round(size / 1024 / 1024));
+  log('Firmware image saved: %dMB (digest: %s)', Math.round(size / 1024 / 1024), digest || 'unknown');
   onProgress?.(`Firmware image ready (${Math.round(size / 1024 / 1024)}MB)`);
   return paths.firmwareTar;
 }
@@ -162,10 +194,8 @@ export async function prepareFirmwareImage(
 export function clearFirmwareCache(): void {
   const paths = getCachePaths();
   try {
-    if (existsSync(paths.firmwareTar)) {
-      execSync(`rm -f "${paths.firmwareTar}" "${paths.firmwareVersion}"`);
-      log('Firmware cache cleared');
-    }
+    execSync(`rm -f "${paths.firmwareTar}" "${paths.firmwareVersion}" "${paths.firmwareDigest}"`);
+    log('Firmware cache cleared');
   } catch {
     // ignore
   }

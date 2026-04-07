@@ -35,6 +35,9 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
           host: form.deviceIp,
           username: form.sshUsername,
           password: form.sshPassword,
+          desktopIp: form.desktopIp,
+          desktopSshUsername: form.desktopSshUsername,
+          desktopSshPassword: form.desktopSshPassword,
         }),
       });
       const data = await res.json();

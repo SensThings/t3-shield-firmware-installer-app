@@ -26,6 +26,9 @@ export default function Header({ onSettingsClick, settings }: HeaderProps) {
             host: settings.deviceIp,
             username: settings.sshUsername,
             password: settings.sshPassword,
+            desktopIp: settings.desktopIp,
+            desktopSshUsername: settings.desktopSshUsername,
+            desktopSshPassword: settings.desktopSshPassword,
           }),
         });
         const data = await res.json();
