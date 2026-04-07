@@ -112,11 +112,16 @@ export async function runSdrTest(
     await desktopConn.uploadFile(getSdrAsset('tx_tone.py'), '/tmp/sdr/tx_tone.py');
     log('Uploaded TX scripts to desktop');
 
-    // Verify B210 on desktop
-    const sdrCheck = await desktopConn.exec('uhd_find_devices 2>/dev/null | grep -c "type: b200" || echo 0');
+    // Verify B210 on desktop (SSH non-interactive may not have UHD in PATH)
+    const sdrCheck = await desktopConn.exec(
+      'export PATH="$PATH:/usr/local/bin:/usr/bin:/opt/uhd/bin" && uhd_find_devices 2>/dev/null | grep -c "type: b200" || echo 0'
+    );
     const sdrCount = parseInt(sdrCheck.stdout.trim()) || 0;
     if (sdrCount < 1) {
-      emit('prep_step', { stepId: 'check_desktop_sdr', status: 'fail', message: 'No B210 SDR detected on desktop' });
+      // Log what we see for debugging
+      const whichUhd = await desktopConn.exec('which uhd_find_devices 2>&1 || echo "not found"; echo "PATH=$PATH"');
+      log('SDR check failed. uhd: %s', whichUhd.stdout.trim());
+      emit('prep_step', { stepId: 'check_desktop_sdr', status: 'fail', message: 'No B210 SDR detected on desktop — check USB connection' });
       throw new Error('No B210 SDR detected on desktop');
     }
 
@@ -161,7 +166,7 @@ export async function runSdrTest(
     const captureDuration = 5;
 
     // Start TX in background on desktop — it runs until killed
-    await desktopConn.exec(`cd /tmp/sdr && nohup python3 tx_tone.py > /tmp/sdr/tx.log 2>&1 & echo $!`);
+    await desktopConn.exec(`cd /tmp/sdr && export PATH="$PATH:/usr/local/bin:/usr/bin" && nohup python3 tx_tone.py > /tmp/sdr/tx.log 2>&1 & echo $!`);
     log('TX started on desktop via SSH');
 
     // Wait for TX to initialize
