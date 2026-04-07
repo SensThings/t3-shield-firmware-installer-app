@@ -12,38 +12,19 @@ export interface SSHConnection {
   close: () => void;
 }
 
-export async function connectSSH(config: {
-  host: string;
-  username: string;
-  password: string;
-  timeout?: number;
-}): Promise<SSHConnection> {
-  const client = new Client();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const SSH_ALGORITHMS: any = {
+  kex: [
+    'ecdh-sha2-nistp256',
+    'ecdh-sha2-nistp384',
+    'ecdh-sha2-nistp521',
+    'diffie-hellman-group-exchange-sha256',
+    'diffie-hellman-group14-sha256',
+    'diffie-hellman-group14-sha1',
+  ],
+};
 
-  const connectConfig: ConnectConfig = {
-    host: config.host,
-    port: 22,
-    username: config.username,
-    password: config.password,
-    readyTimeout: config.timeout || 10000,
-    algorithms: {
-      kex: [
-        'ecdh-sha2-nistp256',
-        'ecdh-sha2-nistp384',
-        'ecdh-sha2-nistp521',
-        'diffie-hellman-group-exchange-sha256',
-        'diffie-hellman-group14-sha256',
-        'diffie-hellman-group14-sha1',
-      ],
-    },
-  };
-
-  await new Promise<void>((resolve, reject) => {
-    client.on('ready', resolve);
-    client.on('error', reject);
-    client.connect(connectConfig);
-  });
-
+function buildConnection(client: Client): SSHConnection {
   const exec = (command: string): Promise<{ stdout: string; stderr: string; code: number }> => {
     return new Promise((resolve, reject) => {
       client.exec(command, (err, stream) => {
@@ -99,6 +80,104 @@ export async function connectSSH(config: {
     execStream,
     uploadFile,
     close: () => client.end(),
+  };
+}
+
+export async function connectSSH(config: {
+  host: string;
+  username: string;
+  password: string;
+  timeout?: number;
+}): Promise<SSHConnection> {
+  const client = new Client();
+
+  const connectConfig: ConnectConfig = {
+    host: config.host,
+    port: 22,
+    username: config.username,
+    password: config.password,
+    readyTimeout: config.timeout || 10000,
+    algorithms: SSH_ALGORITHMS,
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    client.on('ready', resolve);
+    client.on('error', reject);
+    client.connect(connectConfig);
+  });
+
+  return buildConnection(client);
+}
+
+/**
+ * Connect to a target device via an intermediate jump host (ProxyJump).
+ * Server → SSH into jumpHost → TCP forward to target → SSH into target.
+ *
+ * Returns connections to both the jump host and the target.
+ * Call closeAll() to close both connections.
+ */
+export async function connectViaProxy(config: {
+  jumpHost: string;
+  jumpUsername: string;
+  jumpPassword: string;
+  targetHost: string;
+  targetUsername: string;
+  targetPassword: string;
+  timeout?: number;
+}): Promise<{
+  jump: SSHConnection;
+  target: SSHConnection;
+  closeAll: () => void;
+}> {
+  // Connect to jump host
+  const jumpClient = new Client();
+  await new Promise<void>((resolve, reject) => {
+    jumpClient.on('ready', resolve);
+    jumpClient.on('error', reject);
+    jumpClient.connect({
+      host: config.jumpHost,
+      port: 22,
+      username: config.jumpUsername,
+      password: config.jumpPassword,
+      readyTimeout: config.timeout || 10000,
+      algorithms: SSH_ALGORITHMS,
+    });
+  });
+
+  // Create TCP tunnel through jump host to target
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const stream = await new Promise<any>((resolve, reject) => {
+    jumpClient.forwardOut('127.0.0.1', 0, config.targetHost, 22, (err, stream) => {
+      if (err) return reject(new Error(`Tunnel to ${config.targetHost} failed: ${err.message}`));
+      resolve(stream);
+    });
+  });
+
+  // Connect to target through the tunnel
+  const targetClient = new Client();
+  await new Promise<void>((resolve, reject) => {
+    targetClient.on('ready', resolve);
+    targetClient.on('error', reject);
+    targetClient.connect({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      sock: stream as any,
+      username: config.targetUsername,
+      password: config.targetPassword,
+      readyTimeout: config.timeout || 10000,
+      algorithms: SSH_ALGORITHMS,
+    });
+  });
+
+  const jump = buildConnection(jumpClient);
+  const target = buildConnection(targetClient);
+
+  return {
+    jump,
+    target,
+    closeAll: () => {
+      targetClient.end();
+      jumpClient.end();
+    },
   };
 }
 

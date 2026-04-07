@@ -91,9 +91,19 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
           </button>
         </div>
 
-        {/* Connection */}
+        {/* Desktop (workstation) */}
         <div className="mb-6">
-          <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Connection</h3>
+          <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Desktop (Workstation)</h3>
+          <div className="space-y-3 bg-zinc-800/50 rounded-lg p-4">
+            <Field label="Desktop IP" value={form.desktopIp} onChange={v => update('desktopIp', v)} placeholder="IP of the workstation with B210 + Ethernet" />
+            <Field label="Desktop SSH Username" value={form.desktopSshUsername} onChange={v => update('desktopSshUsername', v)} />
+            <Field label="Desktop SSH Password" value={form.desktopSshPassword} onChange={v => update('desktopSshPassword', v)} type="password" />
+          </div>
+        </div>
+
+        {/* Target Device */}
+        <div className="mb-6">
+          <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Target Device</h3>
           <div className="space-y-3 bg-zinc-800/50 rounded-lg p-4">
             <Field label="Device IP" value={form.deviceIp} onChange={v => update('deviceIp', v)} />
             <Field label="SSH Username" value={form.sshUsername} onChange={v => update('sshUsername', v)} />

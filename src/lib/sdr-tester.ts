@@ -1,8 +1,7 @@
-import { connectSSH } from './ssh';
+import { connectSSH, connectViaProxy, type SSHConnection } from './ssh';
 import { Settings, StepUpdateEvent, PrepStepEvent } from './types';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { spawn, ChildProcess } from 'child_process';
 
 export interface SdrTestResult {
   operation: string;
@@ -78,103 +77,96 @@ function parseProgressLine(line: string): StepUpdateEvent | null {
   return null;
 }
 
-function startLocalTx(durationSeconds: number): { process: ChildProcess; kill: () => void } {
-  const configPath = getSdrAssetPath('config.py');
-  const txPath = getSdrAssetPath('tx_tone.py');
-  const dir = join(txPath, '..');
-
-  log('Starting local TX transmitter for %ds from %s', durationSeconds, dir);
-
-  const proc = spawn('python3', [txPath], {
-    cwd: dir,
-    env: { ...process.env, PYTHONUNBUFFERED: '1' },
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-
-  proc.stdout?.on('data', (d: Buffer) => log('[TX stdout] %s', d.toString().trim()));
-  proc.stderr?.on('data', (d: Buffer) => log('[TX stderr] %s', d.toString().trim()));
-  proc.on('error', (err) => log('[TX error] %s', err.message));
-
-  // Auto-kill after duration + buffer
-  const timer = setTimeout(() => {
-    log('TX duration elapsed, sending SIGINT');
-    proc.kill('SIGINT');
-  }, (durationSeconds + 1) * 1000);
-
-  return {
-    process: proc,
-    kill: () => {
-      clearTimeout(timer);
-      if (!proc.killed) {
-        proc.kill('SIGINT');
-        // Force kill after 3s
-        setTimeout(() => {
-          if (!proc.killed) proc.kill('SIGKILL');
-        }, 3000);
-      }
-    },
-  };
-}
-
 export async function runSdrTest(
   serialNumber: string,
   settings: Settings,
   emit: EmitFn
 ): Promise<SdrTestResult> {
-  let conn;
-  let txHandle: { process: ChildProcess; kill: () => void } | null = null;
+  let desktopConn: SSHConnection | null = null;
+  let piConn: SSHConnection | null = null;
+  let closeAll: (() => void) | null = null;
+  const useProxy = !!settings.desktopIp;
 
-  log('Starting SDR test for T3S-%s (host: %s)', serialNumber, settings.deviceIp);
+  log('Starting SDR test for T3S-%s (desktop: %s, device: %s)', serialNumber, settings.desktopIp || 'direct', settings.deviceIp);
 
   try {
-    // === PREP: Check desktop SDR ===
-    emit('prep_step', { stepId: 'check_desktop_sdr', status: 'in_progress', message: 'Checking desktop SDR...' });
-    try {
-      getSdrAssetPath('tx_tone.py');
-      getSdrAssetPath('config.py');
-      log('TX scripts found');
-      emit('prep_step', { stepId: 'check_desktop_sdr', status: 'pass', message: 'Desktop SDR scripts ready' });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      emit('prep_step', { stepId: 'check_desktop_sdr', status: 'fail', message: msg });
-      throw new Error(msg);
+    // === PREP: Connect to desktop and upload TX scripts ===
+    emit('prep_step', { stepId: 'check_desktop_sdr', status: 'in_progress', message: 'Connecting to desktop...' });
+
+    if (!settings.desktopIp) {
+      emit('prep_step', { stepId: 'check_desktop_sdr', status: 'fail', message: 'Desktop IP not configured in Settings' });
+      throw new Error('Desktop IP is required for SDR test — configure it in Settings');
     }
 
-    // === PREP: Upload test scripts to Pi ===
-    emit('prep_step', { stepId: 'upload_test_scripts', status: 'in_progress', message: 'Connecting to device...' });
-
-    conn = await connectSSH({
-      host: settings.deviceIp,
-      username: settings.sshUsername,
-      password: settings.sshPassword,
+    desktopConn = await connectSSH({
+      host: settings.desktopIp,
+      username: settings.desktopSshUsername,
+      password: settings.desktopSshPassword,
       timeout: 10000,
     });
-    log('SSH connected');
+    log('Connected to desktop %s', settings.desktopIp);
 
-    // Create directory and upload scripts
-    await conn.exec('mkdir -p /tmp/sdr');
+    // Upload TX scripts to desktop
+    await desktopConn.exec('mkdir -p /tmp/sdr');
+    await desktopConn.uploadFile(getSdrAsset('config.py'), '/tmp/sdr/config.py');
+    await desktopConn.uploadFile(getSdrAsset('tx_tone.py'), '/tmp/sdr/tx_tone.py');
+    log('Uploaded TX scripts to desktop');
 
-    const configPy = getSdrAsset('config.py');
-    const rxTonePy = getSdrAsset('rx_tone.py');
-    const testSh = getSdrAsset('test.sh');
+    // Verify B210 on desktop
+    const sdrCheck = await desktopConn.exec('uhd_find_devices 2>/dev/null | grep -c "type: b200" || echo 0');
+    const sdrCount = parseInt(sdrCheck.stdout.trim()) || 0;
+    if (sdrCount < 1) {
+      emit('prep_step', { stepId: 'check_desktop_sdr', status: 'fail', message: 'No B210 SDR detected on desktop' });
+      throw new Error('No B210 SDR detected on desktop');
+    }
 
-    await conn.uploadFile(configPy, '/tmp/sdr/config.py');
-    await conn.uploadFile(rxTonePy, '/tmp/sdr/rx_tone.py');
-    await conn.uploadFile(testSh, '/tmp/sdr/test.sh');
+    emit('prep_step', { stepId: 'check_desktop_sdr', status: 'pass', message: 'Desktop SDR ready' });
 
-    log('Uploaded SDR test scripts to Pi');
-    emit('prep_step', { stepId: 'upload_test_scripts', status: 'pass', message: 'Test scripts uploaded' });
+    // === PREP: Connect to Pi (via desktop proxy) and upload RX scripts ===
+    emit('prep_step', { stepId: 'upload_test_scripts', status: 'in_progress', message: 'Connecting to device via desktop...' });
 
-    // === PREP: Start desktop transmitter ===
-    emit('prep_step', { stepId: 'start_transmitter', status: 'in_progress', message: 'Starting desktop transmitter...' });
+    if (useProxy) {
+      const proxy = await connectViaProxy({
+        jumpHost: settings.desktopIp,
+        jumpUsername: settings.desktopSshUsername,
+        jumpPassword: settings.desktopSshPassword,
+        targetHost: settings.deviceIp,
+        targetUsername: settings.sshUsername,
+        targetPassword: settings.sshPassword,
+        timeout: 10000,
+      });
+      piConn = proxy.target;
+      closeAll = proxy.closeAll;
+    } else {
+      piConn = await connectSSH({
+        host: settings.deviceIp,
+        username: settings.sshUsername,
+        password: settings.sshPassword,
+        timeout: 10000,
+      });
+    }
+    log('Connected to Pi');
 
-    const captureDuration = 5; // seconds
-    txHandle = startLocalTx(captureDuration);
+    await piConn.exec('mkdir -p /tmp/sdr');
+    await piConn.uploadFile(getSdrAsset('config.py'), '/tmp/sdr/config.py');
+    await piConn.uploadFile(getSdrAsset('rx_tone.py'), '/tmp/sdr/rx_tone.py');
+    await piConn.uploadFile(getSdrAsset('test.sh'), '/tmp/sdr/test.sh');
+    log('Uploaded RX scripts to Pi');
+
+    emit('prep_step', { stepId: 'upload_test_scripts', status: 'pass', message: 'Test scripts uploaded to device' });
+
+    // === PREP: Start TX on desktop via SSH ===
+    emit('prep_step', { stepId: 'start_transmitter', status: 'in_progress', message: 'Starting transmitter on desktop...' });
+
+    const captureDuration = 5;
+
+    // Start TX in background on desktop — it runs until killed
+    await desktopConn.exec(`cd /tmp/sdr && nohup python3 tx_tone.py > /tmp/sdr/tx.log 2>&1 & echo $!`);
+    log('TX started on desktop via SSH');
 
     // Wait for TX to initialize
     await new Promise(resolve => setTimeout(resolve, 1500));
-    log('TX transmitter started, waiting 1.5s for init');
-    emit('prep_step', { stepId: 'start_transmitter', status: 'pass', message: 'Transmitter active' });
+    emit('prep_step', { stepId: 'start_transmitter', status: 'pass', message: 'Transmitter active on desktop' });
 
     // === RUN: Execute test.sh on Pi ===
     log('Running test.sh on Pi...');
@@ -264,7 +256,7 @@ export async function runSdrTest(
       setTimeout(() => reject(new Error('SDR test timed out after 60 seconds')), timeoutMs);
     });
 
-    const testPromise = conn.execStream(
+    const testPromise = piConn.execStream(
       command,
       (data: string) => processData(data),
       (data: string) => processData(data)
@@ -273,9 +265,11 @@ export async function runSdrTest(
     const exitCode = await Promise.race([testPromise, timeoutPromise]);
     log('test.sh exited with code: %d', exitCode);
 
-    // Stop TX
-    txHandle.kill();
-    txHandle = null;
+    // Stop TX on desktop
+    if (desktopConn) {
+      await desktopConn.exec('pkill -f tx_tone.py 2>/dev/null || true');
+      log('TX stopped on desktop');
+    }
 
     // Fallback JSON extraction
     if (!finalJson) {
@@ -318,8 +312,16 @@ export async function runSdrTest(
     emit('test_error', { error: errorMsg });
     throw new Error(errorMsg);
   } finally {
-    txHandle?.kill();
-    conn?.close();
+    // Always kill TX on desktop
+    if (desktopConn) {
+      try { await desktopConn.exec('pkill -f tx_tone.py 2>/dev/null || true'); } catch { /* ignore */ }
+    }
+    if (closeAll) {
+      closeAll();
+    } else {
+      piConn?.close();
+      desktopConn?.close();
+    }
     log('Cleanup complete');
   }
 }
