@@ -14,9 +14,7 @@ Step-by-step guide to install, configure, and maintain the installer app on tech
    - Copy the token (starts with `ghp_...`) — you'll need it twice
    - The GitHub username is: `elmoadin`
 
-2. **The install script** — copy `deploy/t3s-install.sh` from this repo to a USB drive (or download it on the desktop)
-
-3. **Network access** — the desktop needs internet for the first install (to download Docker, Python packages, and the firmware image). After that, it works offline.
+2. **Network access** — the desktop needs internet for the first install (to download Docker, Python packages, and the firmware image). After that, it works offline.
 
 4. **Desktop credentials** — you need `sudo` access on the desktop
 
@@ -26,12 +24,30 @@ Step-by-step guide to install, configure, and maintain the installer app on tech
 
 ---
 
-## Step 1: Edit the Install Script
+## Step 1: Copy the Install Script to the Desktop
 
-Before running the script, open `t3s-install.sh` in a text editor and replace the GHCR token placeholder:
+From your machine (where you have the repo cloned), send the script via SCP:
 
 ```bash
-nano t3s-install.sh
+scp deploy/t3s-install.sh <user>@<desktop-ip>:~/t3s-install.sh
+```
+
+Example:
+
+```bash
+scp deploy/t3s-install.sh st2@10.87.126.249:~/t3s-install.sh
+```
+
+Then SSH into the desktop:
+
+```bash
+ssh <user>@<desktop-ip>
+```
+
+Edit the script and replace the GHCR token placeholder:
+
+```bash
+nano ~/t3s-install.sh
 ```
 
 Find this line near the top:
@@ -46,11 +62,13 @@ Replace `REPLACE_WITH_YOUR_GHCR_TOKEN` with your actual GitHub PAT. Save and clo
 
 ## Step 2: Run the Install Script
 
+(Still on the desktop via SSH)
+
 ```bash
-sudo bash t3s-install.sh
+sudo bash ~/t3s-install.sh
 ```
 
-The script runs 7 steps automatically:
+The script runs 8 steps automatically:
 
 | Step | What it does |
 |------|-------------|
@@ -146,14 +164,19 @@ This only needs to be done once per desktop.
 
 If you're setting up 10+ desktops, here's the efficient workflow:
 
-1. **Prepare once:**
-   - Edit `t3s-install.sh` with the real GHCR token
-   - Copy it to a USB drive
+1. **Prepare once (on your machine):**
+   - Edit `deploy/t3s-install.sh` with the real GHCR token
+   - Save it — you'll SCP the same file to every desktop
 
 2. **Per desktop:**
-   - Plug in USB drive
-   - Copy `t3s-install.sh` to the desktop
-   - Run `sudo bash t3s-install.sh` (logout/login if Docker wasn't installed)
+   ```bash
+   # Copy script
+   scp deploy/t3s-install.sh <user>@<desktop-ip>:~/t3s-install.sh
+   # SSH in and run
+   ssh <user>@<desktop-ip>
+   sudo bash ~/t3s-install.sh
+   ```
+   - If Docker wasn't installed: logout/login, run again
    - Open browser → login → configure Settings → save
    - Edit `/opt/t3s-installer/t3s-update.sh` with the GHCR token
    - Connect a Pi, program one device to verify everything works
