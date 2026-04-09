@@ -80,8 +80,8 @@ def run_sdr_test(serial_number: str, settings, emit: Callable):
             ["python3", tx_script],
             cwd=str(SDR_DIR),
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
         logger.info("TX started (PID: %d)", tx_proc.pid)
 
@@ -89,10 +89,9 @@ def run_sdr_test(serial_number: str, settings, emit: Callable):
         time.sleep(5)
 
         if tx_proc.poll() is not None:
-            output = tx_proc.stdout.read().decode() if tx_proc.stdout else ""
-            logger.error("TX exited early: %s", output[:500])
+            logger.error("TX exited early (code: %s)", tx_proc.returncode)
             emit("prep_step", {"step_id": "start_transmitter", "status": "fail", "message": "Transmitter failed to start"})
-            raise RuntimeError(f"TX process died: {output[:200]}")
+            raise RuntimeError("TX process died during initialization")
 
         emit("prep_step", {"step_id": "start_transmitter", "status": "pass", "message": "Transmitter active"})
 
