@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'T3-Shield Device Installer',
-  description: 'Program T3-Shield Raspberry Pi devices with firmware',
+  title: 'T3-Shield — Installateur',
+  description: 'Programmer les appareils Raspberry Pi T3-Shield avec le firmware',
 };
 
 export default function RootLayout({
@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark`}>
+    <html lang="fr" className={`${geistSans.variable} ${geistMono.variable} dark`}>
       <body className="bg-zinc-950 text-zinc-100 antialiased min-h-screen flex flex-col font-[family-name:var(--font-geist-sans)]">
         {children}
       </body>

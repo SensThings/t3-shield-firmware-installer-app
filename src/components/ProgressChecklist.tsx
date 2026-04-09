@@ -7,9 +7,10 @@ interface ProgressChecklistProps {
   steps: InstallStep[];
   serialNumber: string;
   startTime: number;
+  mode: 'install' | 'sdr_test';
 }
 
-export default function ProgressChecklist({ steps, serialNumber, startTime }: ProgressChecklistProps) {
+export default function ProgressChecklist({ steps, serialNumber, startTime, mode }: ProgressChecklistProps) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export default function ProgressChecklist({ steps, serialNumber, startTime }: Pr
     <div className="w-full max-w-xl">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-zinc-100">
-          Programming: T3S-{serialNumber}
+          {mode === 'install' ? 'Programmation' : 'Test SDR'} : T3S-{serialNumber}
         </h2>
         <span className="text-sm text-zinc-400 font-mono">
           {elapsed.toFixed(1)}s
@@ -34,13 +35,13 @@ export default function ProgressChecklist({ steps, serialNumber, startTime }: Pr
 
       <div className="space-y-1">
         {steps.map((step) => (
-          <StepRow key={step.number} step={step} />
+          <StepRow key={step.id} step={step} />
         ))}
       </div>
 
       {!allDone && (
         <div className="mt-6 text-center text-sm text-zinc-500">
-          Total elapsed: {elapsed.toFixed(1)}s...
+          Temps écoulé : {elapsed.toFixed(1)}s...
         </div>
       )}
     </div>

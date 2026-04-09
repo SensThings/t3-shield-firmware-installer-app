@@ -1,19 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings, StepStatus, InstallStep, INSTALL_STEPS, PREP_STEPS, SDR_PREP_STEPS, SDR_TEST_STEPS, StepUpdateEvent, PrepStepEvent, InstallResult } from '@/lib/types';
+import { Settings, StepStatus, InstallStep, INSTALL_STEPS, SDR_TEST_STEPS, StepUpdateEvent, PrepStepEvent, InstallResult } from '@/lib/types';
 import { startInstall, startSdrTest, subscribeProgress } from '@/lib/api';
 import ProgressChecklist from './ProgressChecklist';
 
 type View = 'idle' | 'serial_input' | 'programming' | 'success' | 'failure';
 type ActionMode = 'install' | 'sdr_test';
-
-interface PrepStep {
-  id: string;
-  label: string;
-  status: StepStatus;
-  message?: string;
-}
 
 interface SdrMetrics {
   status: string;
@@ -30,11 +23,12 @@ interface DeviceProgrammerProps {
   settings: Settings;
 }
 
+const DEFAULT_ERROR = 'Une erreur est survenue. Réessayez ou signalez au responsable.';
+
 export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
   const [view, setView] = useState<View>('idle');
   const [mode, setMode] = useState<ActionMode>('install');
   const [serialNumber, setSerialNumber] = useState('');
-  const [prepSteps, setPrepSteps] = useState<PrepStep[]>([]);
   const [steps, setSteps] = useState<InstallStep[]>([]);
   const [startTime, setStartTime] = useState(0);
   const [result, setResult] = useState<InstallResult | null>(null);
@@ -50,21 +44,29 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
     }
   }, [view]);
 
-  const initPrepSteps = (m: ActionMode): PrepStep[] =>
-    (m === 'install' ? PREP_STEPS : SDR_PREP_STEPS).map(s => ({ id: s.id, label: s.label, status: 'pending' as const }));
-
-  const initSteps = (m: ActionMode): InstallStep[] =>
-    (m === 'install' ? INSTALL_STEPS : SDR_TEST_STEPS).map((s, i) => ({
-      id: s.id,
-      number: i + 1,
-      label: s.label,
-      status: 'pending',
-    }));
+  const initSteps = (m: ActionMode): InstallStep[] => {
+    const stepDefs = m === 'install' ? INSTALL_STEPS : SDR_TEST_STEPS;
+    let installCounter = 0;
+    return stepDefs.map((s, i) => {
+      const step: InstallStep = {
+        id: s.id,
+        number: i + 1,
+        label: s.label,
+        status: 'pending',
+        source: s.source,
+      };
+      if (s.source === 'install') {
+        installCounter++;
+        step.backendNumber = installCounter;
+      }
+      return step;
+    });
+  };
 
   const handlePrepStep = useCallback((update: PrepStepEvent) => {
-    setPrepSteps(prev => prev.map(s =>
-      s.id === update.step_id
-        ? { ...s, status: update.status, message: update.message }
+    setSteps(prev => prev.map(s =>
+      s.source === 'prep' && s.id === update.step_id
+        ? { ...s, status: update.status, message: update.operator_message || update.message }
         : s
     ));
   }, []);
@@ -72,12 +74,12 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
   const handleStepUpdate = useCallback((update: StepUpdateEvent) => {
     setSteps(prev => {
       const next = [...prev];
-      const idx = update.step_number - 1;
-      if (idx >= 0 && idx < next.length) {
+      const idx = next.findIndex(s => s.source === 'install' && s.backendNumber === update.step_number);
+      if (idx >= 0) {
         next[idx] = {
           ...next[idx],
           status: update.status,
-          message: update.message || next[idx].message,
+          message: update.operator_message || update.message || next[idx].message,
           duration: update.duration,
           startedAt: update.status === 'in_progress' ? Date.now() : next[idx].startedAt,
         };
@@ -97,7 +99,6 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
     const trimmed = serialNumber.trim();
     if (!trimmed || !/^[a-zA-Z0-9]{3,}$/.test(trimmed)) return;
 
-    setPrepSteps(initPrepSteps(mode));
     setSteps(initSteps(mode));
     setStartTime(Date.now());
     setResult(null);
@@ -114,7 +115,7 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
         : await startSdrTest(trimmed, settings as unknown as Record<string, string>);
 
       if (!data.success) {
-        setError(data.error || `Failed to start ${mode === 'install' ? 'installation' : 'SDR test'}`);
+        setError(data.operator_message || data.error || DEFAULT_ERROR);
         setView('failure');
         return;
       }
@@ -137,12 +138,12 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
             setView(r.result === 'pass' ? 'success' : 'failure');
             evtSource.close();
           } else if (parsed.type === errorEvent) {
-            setError((parsed.data as { error: string }).error);
+            setError(parsed.data.operator_message || parsed.data.error || DEFAULT_ERROR);
             setView('failure');
             evtSource.close();
           } else if (parsed.type === 'done') {
             if (parsed.data.status === 'failed') {
-              setError(parsed.data.error || `${mode === 'install' ? 'Installation' : 'SDR test'} failed`);
+              setError(parsed.data.operator_message || parsed.data.error || DEFAULT_ERROR);
               setView('failure');
             } else if (parsed.data.result) {
               setResult(parsed.data.result);
@@ -152,13 +153,13 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
             evtSource.close();
           }
         } catch {
-          // ignore
+          // ignore parse errors
         }
       };
 
       evtSource.onerror = () => evtSource.close();
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to start ${mode === 'install' ? 'installation' : 'SDR test'}`);
+      setError(err instanceof Error ? err.message : DEFAULT_ERROR);
       setView('failure');
     }
   };
@@ -171,7 +172,6 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
   const reset = () => {
     setView('idle');
     setSerialNumber('');
-    setPrepSteps([]);
     setSteps([]);
     setResult(null);
     setSdrMetrics(null);
@@ -191,7 +191,7 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
       <div className="flex flex-col items-center justify-center flex-1 gap-6">
         {missingCreds && (
           <div className="px-4 py-2 bg-amber-900/30 border border-amber-700/50 rounded-lg text-amber-400 text-sm">
-            Configure GHCR credentials in Settings before programming devices.
+            Configurez les identifiants GHCR dans les Paramètres avant de programmer.
           </div>
         )}
         <div className="flex gap-6">
@@ -203,7 +203,7 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
             <svg className="w-12 h-12 text-emerald-500 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
             </svg>
-            <span className="text-lg font-semibold text-zinc-200">Program New Device</span>
+            <span className="text-lg font-semibold text-zinc-200">Programmer un appareil</span>
           </button>
           <button
             onClick={() => startMode('sdr_test')}
@@ -212,7 +212,7 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
             <svg className="w-12 h-12 text-blue-500 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.789m13.788 0c3.808 3.808 3.808 9.981 0 13.79M12 12h.008v.007H12V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
             </svg>
-            <span className="text-lg font-semibold text-zinc-200">SDR Test</span>
+            <span className="text-lg font-semibold text-zinc-200">Tester le SDR</span>
           </button>
         </div>
       </div>
@@ -226,82 +226,33 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-40" onClick={() => setView('idle')}>
         <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
           <h2 className="text-lg font-semibold text-zinc-100 mb-4">
-            {mode === 'install' ? 'Enter Device Serial Number' : 'Enter Device Serial Number (SDR Test)'}
+            Entrez le numéro de série
           </h2>
           <div className="mb-4">
-            <input ref={serialInputRef} type="text" value={serialNumber} onChange={e => setSerialNumber(e.target.value)} onKeyDown={handleKeyDown} placeholder="e.g. 12345"
+            <input ref={serialInputRef} type="text" value={serialNumber} onChange={e => setSerialNumber(e.target.value)} onKeyDown={handleKeyDown} placeholder="ex. 12345"
               className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200 text-lg placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" />
             {serialNumber.trim() && (
-              <p className="text-sm text-zinc-500 mt-2">Hostname will be: <span className="text-zinc-300 font-mono">T3S-{serialNumber.trim()}</span></p>
+              <p className="text-sm text-zinc-500 mt-2">Nom de l&apos;appareil : <span className="text-zinc-300 font-mono">T3S-{serialNumber.trim()}</span></p>
             )}
             {serialNumber.trim() && !isValid && (
-              <p className="text-sm text-red-400 mt-1">Must be alphanumeric, at least 3 characters.</p>
+              <p className="text-sm text-red-400 mt-1">Doit être alphanumérique, au moins 3 caractères.</p>
             )}
           </div>
           <div className="flex justify-end gap-3">
-            <button onClick={() => setView('idle')} className="px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors">Cancel</button>
-            <button onClick={startAction} disabled={!isValid} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors">Start</button>
+            <button onClick={() => setView('idle')} className="px-4 py-2 text-zinc-400 hover:text-zinc-200 transition-colors">Annuler</button>
+            <button onClick={startAction} disabled={!isValid} className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors">Démarrer</button>
           </div>
         </div>
       </div>
     );
   }
 
-  // Programming progress view — shows both prep and install steps
+  // Programming progress — single unified step list
   if (view === 'programming') {
-    const allPrepDone = prepSteps.every(s => s.status === 'pass');
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-8">
         <div className="w-full max-w-xl">
-          {/* Prep phase */}
-          {!allPrepDone && (
-            <div className="mb-6">
-              <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Preparing Files</h3>
-              <div className="space-y-1">
-                {prepSteps.map(s => (
-                  <div key={s.id} className={`flex items-center gap-3 py-2 px-3 rounded-lg ${s.status === 'in_progress' ? 'bg-zinc-800/50' : ''}`}>
-                    <div className="flex-shrink-0">
-                      {s.status === 'pending' && <div className="w-4 h-4 rounded-full border-2 border-zinc-700" />}
-                      {s.status === 'in_progress' && (
-                        <svg className="w-4 h-4 animate-spin text-amber-500" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                      )}
-                      {s.status === 'pass' && (
-                        <svg className="w-4 h-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                      {s.status === 'fail' && (
-                        <svg className="w-4 h-4 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className={`text-sm ${s.status === 'pending' ? 'text-zinc-600' : 'text-zinc-300'}`}>{s.label}</span>
-                      {s.message && s.status !== 'pending' && (
-                        <p className="text-xs text-zinc-500 mt-0.5">{s.message}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Install phase */}
-          {allPrepDone && (
-            <ProgressChecklist steps={steps} serialNumber={serialNumber.trim()} startTime={startTime} />
-          )}
-
-          {/* Show both when prep is done but install hasn't started */}
-          {!allPrepDone && prepSteps.some(s => s.status !== 'pending') && (
-            <div className="mt-4 text-center text-sm text-zinc-500">
-              Preparing files for transfer...
-            </div>
-          )}
+          <ProgressChecklist steps={steps} serialNumber={serialNumber.trim()} startTime={startTime} mode={mode} />
         </div>
       </div>
     );
@@ -316,36 +267,36 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
           </svg>
           <h2 className="text-xl font-semibold text-zinc-100 mb-4">
-            {mode === 'install' ? 'Device programmed successfully!' : 'SDR test passed!'}
+            {mode === 'install' ? 'Appareil programmé avec succès !' : 'Test SDR réussi !'}
           </h2>
           <div className="space-y-2 text-sm text-zinc-400 mb-6">
-            <p>Device: <span className="text-zinc-200 font-mono">T3S-{serialNumber.trim()}</span></p>
-            {mode === 'install' && result?.version && <p>Firmware: <span className="text-zinc-200">{result.version}</span></p>}
-            {mode === 'install' && result?.image && <p>Image: <span className="text-zinc-200 font-mono text-xs">{result.image}</span></p>}
+            <p>Appareil : <span className="text-zinc-200 font-mono">T3S-{serialNumber.trim()}</span></p>
+            {mode === 'install' && result?.version && <p>Firmware : <span className="text-zinc-200">{result.version}</span></p>}
+            {mode === 'install' && result?.image && <p>Image : <span className="text-zinc-200 font-mono text-xs">{result.image}</span></p>}
             {mode === 'sdr_test' && sdrMetrics && (
               <div className="grid grid-cols-2 gap-3 mt-3">
                 <div className="bg-zinc-800 rounded-lg p-3 text-center">
                   <div className="text-xs text-zinc-500">SNR</div>
                   <div className="text-lg font-mono text-emerald-400">{sdrMetrics.snr_db} dB</div>
-                  <div className="text-xs text-zinc-600">threshold: {sdrMetrics.snr_threshold_db} dB</div>
+                  <div className="text-xs text-zinc-600">seuil : {sdrMetrics.snr_threshold_db} dB</div>
                 </div>
                 <div className="bg-zinc-800 rounded-lg p-3 text-center">
-                  <div className="text-xs text-zinc-500">Freq Error</div>
+                  <div className="text-xs text-zinc-500">Erreur fréq.</div>
                   <div className="text-lg font-mono text-emerald-400">{sdrMetrics.freq_error_hz} Hz</div>
                 </div>
                 <div className="bg-zinc-800 rounded-lg p-3 text-center">
-                  <div className="text-xs text-zinc-500">Peak Frequency</div>
+                  <div className="text-xs text-zinc-500">Fréquence pic</div>
                   <div className="text-lg font-mono text-zinc-200">{sdrMetrics.peak_freq_hz} Hz</div>
                 </div>
                 <div className="bg-zinc-800 rounded-lg p-3 text-center">
-                  <div className="text-xs text-zinc-500">Noise Floor</div>
+                  <div className="text-xs text-zinc-500">Plancher de bruit</div>
                   <div className="text-lg font-mono text-zinc-200">{sdrMetrics.noise_floor_db} dB</div>
                 </div>
               </div>
             )}
           </div>
           <button onClick={reset} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors">
-            Program Another Device
+            Autre appareil
           </button>
         </div>
       </div>
@@ -355,25 +306,26 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
   // Failure view
   if (view === 'failure') {
     const failedStep = steps.find(s => s.status === 'fail');
-    const failedPrep = prepSteps.find(s => s.status === 'fail');
     return (
       <div className="flex flex-col items-center justify-center flex-1 gap-6">
         <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-8 text-center max-w-md">
           <svg className="w-16 h-16 text-red-500 mx-auto mb-4" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
           </svg>
-          <h2 className="text-xl font-semibold text-zinc-100 mb-2">Programming failed</h2>
-          {(failedStep || failedPrep) && (
+          <h2 className="text-xl font-semibold text-zinc-100 mb-2">
+            {mode === 'install' ? 'Programmation échouée' : 'Test SDR échoué'}
+          </h2>
+          {failedStep && (
             <p className="text-sm text-zinc-400 mb-1">
-              Failed at: <span className="text-red-400">{failedStep?.label || failedPrep?.label}</span>
+              Échoué à : <span className="text-red-400">{failedStep.label}</span>
             </p>
           )}
           <p className="text-sm text-red-400/80 mb-6">
-            {error || failedStep?.message || failedPrep?.message || 'Unknown error'}
+            {error || failedStep?.message || DEFAULT_ERROR}
           </p>
           <div className="flex justify-center gap-3">
-            <button onClick={retry} className="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-lg font-medium transition-colors">Retry</button>
-            <button onClick={reset} className="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-lg font-medium transition-colors">Program Another</button>
+            <button onClick={retry} className="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-lg font-medium transition-colors">Réessayer</button>
+            <button onClick={reset} className="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-lg font-medium transition-colors">Autre appareil</button>
           </div>
         </div>
       </div>

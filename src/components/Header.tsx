@@ -36,9 +36,9 @@ export default function Header({ onSettingsClick, settings }: HeaderProps) {
   }, [settings.deviceIp, settings.sshUsername, settings.sshPassword]);
 
   const statusLabel =
-    connectionStatus === 'connected' ? 'Device connected' :
-    connectionStatus === 'disconnected' ? 'Device unreachable' :
-    'Checking...';
+    connectionStatus === 'connected' ? 'Appareil connecté' :
+    connectionStatus === 'disconnected' ? 'Appareil injoignable' :
+    'Vérification...';
 
   return (
     <header className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900">
@@ -48,7 +48,7 @@ export default function Header({ onSettingsClick, settings }: HeaderProps) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
           </svg>
         </div>
-        <h1 className="text-lg font-semibold text-zinc-100">T3-Shield Device Installer</h1>
+        <h1 className="text-lg font-semibold text-zinc-100">T3-Shield — Installateur</h1>
       </div>
 
       <div className="flex items-center gap-4">
@@ -68,7 +68,7 @@ export default function Header({ onSettingsClick, settings }: HeaderProps) {
         <button
           onClick={onSettingsClick}
           className="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors"
-          title="Settings"
+          title="Paramètres"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />

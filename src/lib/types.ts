@@ -26,30 +26,46 @@ export interface InstallStep {
   message?: string;
   duration?: number;
   startedAt?: number;
+  /** Whether this step is updated via prep_step (by id) or step_update (by number) */
+  source: 'prep' | 'install';
+  /** For install-source steps, the backend step_number (1-based within install phase) */
+  backendNumber?: number;
 }
 
-export const PREP_STEPS: { id: string; label: string }[] = [
-  { id: 'prepare_docker', label: 'Prepare Docker binaries' },
-  { id: 'prepare_firmware', label: 'Prepare firmware image' },
-  { id: 'upload_script', label: 'Upload install script' },
-  { id: 'upload_docker', label: 'Upload Docker binaries' },
-  { id: 'upload_firmware', label: 'Upload firmware image' },
+// Unified install steps: prep + install in one list, French labels
+export const INSTALL_STEPS: { id: string; label: string; source: 'prep' | 'install' }[] = [
+  // Prep phase (updated via prep_step events by step_id)
+  { id: 'prepare_docker', label: 'Préparer les binaires Docker', source: 'prep' },
+  { id: 'prepare_firmware', label: 'Préparer l\'image firmware', source: 'prep' },
+  { id: 'upload_script', label: 'Transférer le script d\'installation', source: 'prep' },
+  { id: 'upload_docker', label: 'Transférer les binaires Docker', source: 'prep' },
+  { id: 'upload_firmware', label: 'Transférer l\'image firmware', source: 'prep' },
+  // Install phase (updated via step_update events by step_number)
+  { id: 'set_hostname', label: 'Définir le nom de l\'appareil', source: 'install' },
+  { id: 'expand_partition', label: 'Étendre la partition SD', source: 'install' },
+  { id: 'configure_network', label: 'Configurer le réseau', source: 'install' },
+  { id: 'docker_install', label: 'Installer Docker', source: 'install' },
+  { id: 'create_dirs', label: 'Créer les répertoires', source: 'install' },
+  { id: 'write_config', label: 'Écrire la configuration', source: 'install' },
+  { id: 'registry_login', label: 'Connexion au registre', source: 'install' },
+  { id: 'pull_image', label: 'Télécharger l\'image firmware', source: 'install' },
+  { id: 'install_update_script', label: 'Installer le script de mise à jour', source: 'install' },
+  { id: 'start_container', label: 'Démarrer le conteneur', source: 'install' },
+  { id: 'health_check', label: 'Vérification de santé', source: 'install' },
+  { id: 'sdr_warmup', label: 'Préchauffage SDR', source: 'install' },
+  { id: 'sdr_verify', label: 'Vérifier le statut SDR', source: 'install' },
 ];
 
-export const INSTALL_STEPS: { id: string; label: string }[] = [
-  { id: 'set_hostname', label: 'Set device hostname' },
-  { id: 'expand_partition', label: 'Expand SD card partition' },
-  { id: 'configure_network', label: 'Configure network' },
-  { id: 'docker_install', label: 'Install Docker' },
-  { id: 'create_dirs', label: 'Create data directories' },
-  { id: 'write_config', label: 'Write default config' },
-  { id: 'registry_login', label: 'Login to registry' },
-  { id: 'pull_image', label: 'Pull firmware image' },
-  { id: 'install_update_script', label: 'Install update script' },
-  { id: 'start_container', label: 'Start container' },
-  { id: 'health_check', label: 'Health check' },
-  { id: 'sdr_warmup', label: 'SDR warmup' },
-  { id: 'sdr_verify', label: 'Verify SDR status' },
+// Unified SDR test steps: prep + test in one list, French labels
+export const SDR_TEST_STEPS: { id: string; label: string; source: 'prep' | 'install' }[] = [
+  // Prep phase
+  { id: 'check_desktop_sdr', label: 'Vérifier le SDR du poste', source: 'prep' },
+  { id: 'upload_test_scripts', label: 'Transférer les scripts de test', source: 'prep' },
+  { id: 'start_transmitter', label: 'Démarrer l\'émetteur', source: 'prep' },
+  // Test phase (updated via step_update events)
+  { id: 'init_receiver', label: 'Initialiser le récepteur SDR', source: 'install' },
+  { id: 'run_test', label: 'Capturer et analyser le signal RF', source: 'install' },
+  { id: 'validate_results', label: 'Valider les résultats', source: 'install' },
 ];
 
 export interface InstallResult {
@@ -74,6 +90,7 @@ export interface StepUpdateEvent {
   step_number: number;
   status: StepStatus;
   message?: string;
+  operator_message?: string;
   duration?: number;
 }
 
@@ -81,20 +98,8 @@ export interface PrepStepEvent {
   step_id: string;
   status: StepStatus;
   message?: string;
+  operator_message?: string;
 }
-
-// SDR Test
-export const SDR_PREP_STEPS: { id: string; label: string }[] = [
-  { id: 'check_desktop_sdr', label: 'Check desktop SDR' },
-  { id: 'upload_test_scripts', label: 'Upload test scripts' },
-  { id: 'start_transmitter', label: 'Start transmitter' },
-];
-
-export const SDR_TEST_STEPS: { id: string; label: string }[] = [
-  { id: 'init_receiver', label: 'Initialize SDR receiver' },
-  { id: 'run_test', label: 'Capture and analyze RF' },
-  { id: 'validate_results', label: 'Validate results' },
-];
 
 export interface CacheStatus {
   dockerBinaries: boolean;
@@ -108,6 +113,7 @@ export interface InstallCompleteEvent {
 
 export interface InstallErrorEvent {
   error: string;
+  operator_message?: string;
 }
 
 export interface TestConnectionResult {

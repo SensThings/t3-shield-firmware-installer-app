@@ -32,7 +32,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
       const data = await apiTestConnection(form.deviceIp, form.sshUsername, form.sshPassword);
       setTestResult(data);
     } catch {
-      setTestResult({ success: false, message: 'Request failed' });
+      setTestResult({ success: false, message: 'Requête échouée' });
     } finally {
       setTesting(false);
     }
@@ -45,7 +45,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
       const data = await apiTestGhcr(form.ghcrUsername, form.ghcrToken, form.firmwareImage);
       setGhcrResult(data);
     } catch {
-      setGhcrResult({ success: false, message: 'Request failed' });
+      setGhcrResult({ success: false, message: 'Requête échouée' });
     } finally {
       setTestingGhcr(false);
     }
@@ -63,7 +63,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-zinc-100">Settings</h2>
+          <h2 className="text-lg font-semibold text-zinc-100">Paramètres</h2>
           <button
             onClick={onClose}
             className="p-1 text-zinc-400 hover:text-zinc-200 transition-colors"
@@ -76,13 +76,13 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
 
         {/* Target Device */}
         <div className="mb-6">
-          <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Target Device</h3>
+          <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Appareil cible</h3>
           <div className="space-y-3 bg-zinc-800/50 rounded-lg p-4">
-            <Field label="Device IP" value={form.deviceIp} onChange={v => update('deviceIp', v)} />
-            <Field label="SSH Username" value={form.sshUsername} onChange={v => update('sshUsername', v)} />
+            <Field label="Adresse IP" value={form.deviceIp} onChange={v => update('deviceIp', v)} />
+            <Field label="Utilisateur SSH" value={form.sshUsername} onChange={v => update('sshUsername', v)} />
             <div className="relative">
               <Field
-                label="SSH Password"
+                label="Mot de passe SSH"
                 value={form.sshPassword}
                 onChange={v => update('sshPassword', v)}
                 type={showPassword ? 'text' : 'password'}
@@ -92,7 +92,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-2 top-7 text-zinc-500 hover:text-zinc-300 text-xs"
               >
-                {showPassword ? 'Hide' : 'Show'}
+                {showPassword ? 'Masquer' : 'Afficher'}
               </button>
             </div>
 
@@ -102,7 +102,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
                 disabled={testing}
                 className="px-3 py-1.5 text-sm bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 rounded-md transition-colors"
               >
-                {testing ? 'Testing...' : 'Test Connection'}
+                {testing ? 'Test en cours...' : 'Tester la connexion'}
               </button>
               {testResult && (
                 <span className={`text-sm ${testResult.success ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -115,26 +115,26 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
 
         {/* Container Registry */}
         <div className="mb-6">
-          <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Container Registry</h3>
+          <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Registre de conteneurs</h3>
           <div className="space-y-3 bg-zinc-800/50 rounded-lg p-4">
-            <Field label="GHCR Username" value={form.ghcrUsername} onChange={v => update('ghcrUsername', v)} placeholder="GitHub username" />
+            <Field label="Utilisateur GHCR" value={form.ghcrUsername} onChange={v => update('ghcrUsername', v)} placeholder="Nom d'utilisateur GitHub" />
             <div className="relative">
               <Field
-                label="GHCR Token"
+                label="Jeton GHCR"
                 value={form.ghcrToken}
                 onChange={v => update('ghcrToken', v)}
                 type={showToken ? 'text' : 'password'}
-                placeholder="GitHub PAT with read:packages"
+                placeholder="PAT GitHub avec read:packages"
               />
               <button
                 type="button"
                 onClick={() => setShowToken(!showToken)}
                 className="absolute right-2 top-7 text-zinc-500 hover:text-zinc-300 text-xs"
               >
-                {showToken ? 'Hide' : 'Show'}
+                {showToken ? 'Masquer' : 'Afficher'}
               </button>
             </div>
-            <Field label="Firmware Image" value={form.firmwareImage} onChange={v => update('firmwareImage', v)} />
+            <Field label="Image firmware" value={form.firmwareImage} onChange={v => update('firmwareImage', v)} />
 
             <div className="flex items-center gap-3 pt-1 flex-wrap">
               <button
@@ -142,7 +142,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
                 disabled={testingGhcr || !form.ghcrUsername || !form.ghcrToken}
                 className="px-3 py-1.5 text-sm bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 rounded-md transition-colors"
               >
-                {testingGhcr ? 'Testing...' : 'Test GHCR'}
+                {testingGhcr ? 'Test en cours...' : 'Tester GHCR'}
               </button>
               <button
                 onClick={async () => {
@@ -150,9 +150,9 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
                   setRefreshResult(null);
                   try {
                     await apiClearCache();
-                    setRefreshResult('Cache cleared — will re-download on next install');
+                    setRefreshResult('Cache vidé — re-téléchargement au prochain install');
                   } catch {
-                    setRefreshResult('Failed to clear cache');
+                    setRefreshResult('Échec du vidage du cache');
                   } finally {
                     setRefreshing(false);
                   }
@@ -160,7 +160,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
                 disabled={refreshing}
                 className="px-3 py-1.5 text-sm bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 rounded-md transition-colors"
               >
-                {refreshing ? 'Clearing...' : 'Refresh Image'}
+                {refreshing ? 'Vidage...' : 'Rafraîchir l\'image'}
               </button>
               {ghcrResult && (
                 <span className={`text-sm ${ghcrResult.success ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -179,7 +179,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
             onClick={handleSave}
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors"
           >
-            Save
+            Enregistrer
           </button>
         </div>
       </div>
