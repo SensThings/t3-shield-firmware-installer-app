@@ -7,6 +7,7 @@ from typing import Callable
 
 from ..services import ssh_service, offline_assets
 from ..utils.progress_parser import OutputProcessor
+from ..utils.error_handler import get_operator_message, get_connection_message, get_prep_message
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,11 @@ def run_install(serial_number: str, settings, emit: Callable):
 
         result = processor.extract_json_fallback()
         if result:
+            # Enrich failed steps with operator messages
+            if result.get("result") == "fail":
+                for step in result.get("steps", []):
+                    if step.get("status") == "fail":
+                        step["operator_message"] = get_operator_message("install", step.get("name", ""), "fail")
             emit("install_complete", result)
             return result
 
@@ -118,10 +124,12 @@ def run_install(serial_number: str, settings, emit: Callable):
         msg = str(e)
         logger.error("Install failed: %s", msg)
         if "timed out" in msg.lower() or "refused" in msg.lower():
-            msg = f"Cannot reach device at {settings.device_ip} — check Ethernet cable"
+            operator_msg = get_connection_message("unreachable")
         elif "authentication" in msg.lower():
-            msg = "Authentication failed — check credentials in Settings"
-        emit("install_error", {"error": msg})
+            operator_msg = get_connection_message("auth_failed")
+        else:
+            operator_msg = get_connection_message("timeout")
+        emit("install_error", {"error": msg, "operator_message": operator_msg})
         raise
     finally:
         if conn:

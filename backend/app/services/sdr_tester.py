@@ -8,6 +8,7 @@ from typing import Callable
 
 from ..services import ssh_service
 from ..utils.progress_parser import OutputProcessor
+from ..utils.error_handler import get_operator_message, get_connection_message
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +121,11 @@ def run_sdr_test(serial_number: str, settings, emit: Callable):
 
         result = processor.extract_json_fallback()
         if result:
+            # Enrich failed steps with operator messages
+            if result.get("result") == "fail":
+                for step in result.get("steps", []):
+                    if step.get("status") == "fail":
+                        step["operator_message"] = get_operator_message("sdr_test", step.get("name", ""), "fail")
             emit("test_complete", result)
             return result
 
@@ -132,8 +138,14 @@ def run_sdr_test(serial_number: str, settings, emit: Callable):
         msg = str(e)
         logger.error("SDR test failed: %s", msg)
         if "timed out" in msg.lower() or "refused" in msg.lower():
-            msg = f"Cannot reach device at {settings.device_ip} — check Ethernet cable"
-        emit("test_error", {"error": msg})
+            operator_msg = get_connection_message("unreachable")
+        elif "authentication" in msg.lower():
+            operator_msg = get_connection_message("auth_failed")
+        elif "No B210" in msg or "UHD" in msg:
+            operator_msg = get_operator_message("sdr_test", "init_receiver", "fail")
+        else:
+            operator_msg = "Une erreur est survenue. Réessayez ou signalez au responsable."
+        emit("test_error", {"error": msg, "operator_message": operator_msg})
         raise
     finally:
         if tx_proc and tx_proc.poll() is None:

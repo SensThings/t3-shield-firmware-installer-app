@@ -1,0 +1,88 @@
+{
+  "install": {
+    "set_hostname": {
+      "fail": "Impossible de configurer le nom de l'appareil. Débranchez et rebranchez le câble Ethernet, puis réessayez."
+    },
+    "expand_partition": {
+      "fail": "L'espace de stockage n'a pas pu être étendu. La carte SD est peut-être endommagée — essayez une autre carte."
+    },
+    "configure_network": {
+      "fail": "Configuration réseau échouée. Mode hors ligne — cette étape est normalement ignorée."
+    },
+    "docker_install": {
+      "fail": "L'installation du moteur logiciel a échoué. Vérifiez que l'image de base est correcte sur la carte SD."
+    },
+    "create_dirs": {
+      "fail": "Impossible de créer les dossiers nécessaires. Réessayez ou signalez au responsable."
+    },
+    "write_config": {
+      "fail": "La configuration par défaut n'a pas pu être écrite. Réessayez ou signalez au responsable."
+    },
+    "registry_login": {
+      "fail": "Connexion au registre échouée. Mode hors ligne — cette étape est normalement ignorée."
+    },
+    "pull_image": {
+      "fail": "Le firmware n'a pas pu être chargé sur l'appareil. Vérifiez que le fichier firmware est à jour (cliquez Rafraîchir dans Paramètres)."
+    },
+    "install_update_script": {
+      "fail": "Le script de mise à jour n'a pas pu être installé. Réessayez ou signalez au responsable."
+    },
+    "start_container": {
+      "fail": "Le firmware n'a pas pu démarrer. Débranchez l'appareil, attendez 10 secondes, rebranchez, puis réessayez."
+    },
+    "health_check": {
+      "fail": "Le firmware a démarré mais ne répond pas. Débranchez l'appareil, attendez 10 secondes, rebranchez, puis réessayez."
+    },
+    "sdr_warmup": {
+      "fail": "Le récepteur de signal n'a pas pu s'initialiser. Vérifiez la connexion USB du SDR sur l'appareil."
+    },
+    "sdr_verify": {
+      "fail": "Le récepteur de signal n'est pas prêt. Débranchez le câble USB du SDR de l'appareil, rebranchez-le, puis réessayez."
+    }
+  },
+  "sdr_test": {
+    "init_receiver": {
+      "fail": "Le récepteur de signal de l'appareil n'a pas été détecté. Vérifiez le câble USB du SDR sur l'appareil."
+    },
+    "run_test": {
+      "fail": "La capture du signal a échoué. Vérifiez que le câble coaxial est bien connecté au bon port (RX2) et réessayez."
+    },
+    "validate_results": {
+      "fail": "Le test de validation a échoué. Vérifiez les connexions du câble coaxial et réessayez.",
+      "no_signal": "Aucun signal détecté. Vérifiez : 1) Le câble coaxial est bien branché des deux côtés. 2) Le bon port est utilisé (RX2 sur l'appareil). 3) Le SDR du poste est connecté en USB.",
+      "low_snr": "Signal trop faible. Vérifiez les connexions du câble coaxial — elles sont peut-être desserrées.",
+      "freq_error": "Signal détecté à la mauvaise fréquence. Débranchez et rebranchez le câble coaxial, puis réessayez."
+    }
+  },
+  "connection": {
+    "unreachable": "Impossible d'atteindre l'appareil. Vérifiez : 1) Le câble Ethernet est branché. 2) L'appareil est allumé. 3) Le voyant vert du port Ethernet clignote.",
+    "auth_failed": "Connexion refusée. Les identifiants de l'appareil ont peut-être changé — vérifiez les Paramètres.",
+    "timeout": "Délai de connexion dépassé. Débranchez le câble Ethernet, attendez 5 secondes, rebranchez, puis réessayez."
+  },
+  "preparation": {
+    "prepare_docker": {
+      "fail": "Impossible de préparer les binaires Docker. Vérifiez la connexion internet du poste."
+    },
+    "prepare_firmware": {
+      "fail": "Impossible de préparer le firmware. Vérifiez la connexion internet et les identifiants GHCR dans Paramètres."
+    },
+    "upload_script": {
+      "fail": "Impossible d'envoyer le script d'installation. Vérifiez la connexion Ethernet avec l'appareil."
+    },
+    "upload_docker": {
+      "fail": "Impossible d'envoyer les binaires Docker. Vérifiez la connexion Ethernet avec l'appareil."
+    },
+    "upload_firmware": {
+      "fail": "Impossible d'envoyer le firmware. Vérifiez la connexion Ethernet avec l'appareil."
+    },
+    "check_desktop_sdr": {
+      "fail": "Aucun SDR détecté sur ce poste. Vérifiez le câble USB connectant le SDR du poste."
+    },
+    "upload_test_scripts": {
+      "fail": "Impossible d'envoyer les scripts de test. Vérifiez la connexion Ethernet avec l'appareil."
+    },
+    "start_transmitter": {
+      "fail": "L'émetteur n'a pas pu démarrer. Vérifiez la connexion USB du SDR du poste."
+    }
+  }
+}

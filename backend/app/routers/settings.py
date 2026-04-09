@@ -5,6 +5,7 @@ from fastapi import APIRouter
 
 from ..models.schemas import TestConnectionRequest, TestGhcrRequest
 from ..services.ssh_service import test_connection
+from ..utils.error_handler import load_checklist
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -53,3 +54,16 @@ async def test_ghcr(req: TestGhcrRequest):
 
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+
+@router.get("/checklist")
+async def get_checklist():
+    return load_checklist()
+
+
+@router.post("/auth/login")
+async def login(credentials: dict):
+    # Hardcoded for now — will be replaced with real auth
+    if credentials.get("username") == "op" and credentials.get("password") == "123":
+        return {"success": True, "operator_id": "op", "name": "Opérateur"}
+    return {"success": False, "message": "Identifiants incorrects"}
