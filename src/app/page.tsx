@@ -55,6 +55,11 @@ export default function Home() {
     setSessionKey(prev => prev + 1);
   };
 
+  const handleLogout = () => {
+    clearAuth();
+    router.replace('/login');
+  };
+
   if (!authChecked) {
     return (
       <div className="flex items-center justify-center flex-1 min-h-screen">
@@ -74,6 +79,7 @@ export default function Home() {
         deviceCount={deviceCount}
         onPauseResume={sessionSeconds >= 0 ? handlePauseResume : undefined}
         onFinishSession={sessionSeconds >= 0 ? handleFinishSession : undefined}
+        onLogout={handleLogout}
       />
       <main className="flex-1 flex">
         <SessionManager
