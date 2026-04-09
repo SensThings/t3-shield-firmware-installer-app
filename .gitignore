@@ -42,6 +42,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# python
+__pycache__/
+*.pyc
+
+# local dev artifacts
 INITIAL_PROMPT.md
 sdr_ui_test-master/
 *.jpeg

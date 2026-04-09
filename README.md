@@ -1,65 +1,59 @@
-# T3-Shield Firmware Installer App
+# T3-Shield Firmware Installer
 
-Desktop web app for programming new Raspberry Pi devices with T3-Shield firmware. Technicians connect a fresh Pi via Ethernet, enter a serial number, click Start, and the app handles everything via SSH.
+Desktop web application for programming new Raspberry Pi devices with T3-Shield firmware. Technicians connect a fresh Pi via Ethernet, enter a serial number, click Start, and the app handles everything — file transfers, Docker installation, firmware deployment, and SDR verification.
 
-## Quick Start
+Deployed on technician desktops as a two-service stack: FastAPI backend (native) + Next.js frontend (Docker).
 
-### Docker (recommended)
+## Architecture
 
-```bash
-docker run -d --name t3shield-installer --network host \
-  ghcr.io/sensthings/t3-shield-firmware-installer-app:latest
+```
+Browser (localhost:3000)        → Next.js frontend (UI, SSE client)
+    ↕ HTTP + SSE
+FastAPI backend (localhost:8000) → SSH/SFTP to Pi, SDR TX, cache
+    ↕ SSH over Ethernet
+Raspberry Pi (192.168.137.100)  → install.sh, firmware container, SDR RX
 ```
 
-Open http://localhost:3000
-
-### Development
+## Quick Start (Development)
 
 ```bash
-npm install
-npm run dev
+# Frontend
+npm install && npm run dev          # → http://localhost:3000
+
+# Backend
+cd backend
+pip install -r requirements.txt
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-## Usage
+Login: `op` / `123`
 
-1. Connect a Raspberry Pi via Ethernet (default IP: `192.168.137.100`)
-2. Configure GHCR credentials in Settings (gear icon)
-3. Click **Program New Device**
-4. Enter the device serial number
-5. Watch real-time progress as the firmware is installed
+## Desktop Deployment
 
-## Configuration
+```bash
+sudo bash deploy/t3s-install.sh     # First-time setup
+sudo bash /opt/t3s-installer/t3s-update.sh  # Update to latest
+```
 
-Access settings via the gear icon in the header:
+## Documentation
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Device IP | `192.168.137.100` | Pi's Ethernet IP |
-| SSH Username | `sensthings` | SSH login user |
-| SSH Password | `Sensthings@012` | SSH login password |
-| GHCR Username | *(required)* | GitHub username for container registry |
-| GHCR Token | *(required)* | GitHub PAT with `read:packages` scope |
-| Firmware Image | `ghcr.io/sensthings/t3shield-firmware:latest` | Docker image to pull |
-
-## Install Steps
-
-The firmware installation runs 11 steps on the Pi:
-
-1. Set device hostname (T3S-\<serial\>)
-2. Install Docker
-3. Create data directories
-4. Write default config
-5. Login to container registry
-6. Pull firmware image
-7. Install update script
-8. Start container
-9. Health check
-10. SDR warmup
-11. Verify SDR status
+| Document | Description |
+|----------|-------------|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Full technical reference — components, protocols, data flows, step-by-step install/SDR flows |
+| [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | Developer guide — project structure, how to add steps/endpoints, git workflow, CI/CD |
+| [docs/SETUP.md](docs/SETUP.md) | Desktop deployment — prerequisites, installation, configuration, troubleshooting |
 
 ## Tech Stack
 
-- **Frontend:** Next.js 16 (App Router), React, Tailwind CSS
-- **Backend:** Next.js API routes with SSE streaming
-- **SSH:** `ssh2` npm package
-- **Container:** Docker with standalone Next.js output
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 16 (App Router), React, Tailwind CSS |
+| Backend | FastAPI, Python 3.12, Paramiko (SSH), UHD (SDR) |
+| Communication | HTTP + Server-Sent Events (SSE) |
+| Deployment | systemd (backend) + Docker (frontend) |
+| CI/CD | GitHub Actions → `ghcr.io/sensthings/t3s-installer-{backend,frontend}` |
+
+## Repos
+
+- **This repo:** Installer app (frontend + backend + deploy scripts)
+- **Firmware:** [SensThings/t3-shield-firmware](https://github.com/SensThings/t3-shield-firmware) (provides `install.sh` and the firmware Docker image)
