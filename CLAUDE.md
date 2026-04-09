@@ -61,8 +61,16 @@ Login → Pre-flight checklist → Serial input → Program (18 steps) → SDR T
 - `package.json` version must match `VERSION`
 - Backend reads `VERSION` at startup → exposed in `GET /health` response
 - Frontend reads `VERSION` at build time → displayed in Header
-- To release: update `VERSION` + `package.json`, commit, tag `vX.Y.Z`, push
 - Update script supports: `--check` (compare versions), `--force`, or `vX.Y.Z` (specific version)
+
+**MANDATORY: Bump the version on every push to main.** Use semver:
+- **Patch** (1.0.X): bug fixes, UI tweaks, doc updates
+- **Minor** (1.X.0): new features, new steps, new endpoints
+- **Major** (X.0.0): breaking changes, architecture changes
+
+**How to release:** Update `VERSION` + `package.json` version → commit → `git tag vX.Y.Z` → `git push origin main --tags`
+
+**Do NOT push to main without bumping the version.** The update script compares versions — same version = no update detected.
 
 ## Rules: Documentation
 
