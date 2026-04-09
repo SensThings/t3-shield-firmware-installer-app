@@ -54,6 +54,28 @@ Login → Pre-flight checklist → Serial input → Program (18 steps) → SDR T
 
 ---
 
+## Versioning
+
+- **Single source of truth:** `VERSION` file in repo root (e.g. `1.0.0`)
+- `package.json` version must match `VERSION`
+- Backend reads `VERSION` at startup → exposed in `GET /health` response
+- Frontend reads `VERSION` at build time → displayed in Header
+- To release: update `VERSION` + `package.json`, commit, tag `vX.Y.Z`, push
+- Update script supports: `--check` (compare versions), `--force`, or `vX.Y.Z` (specific version)
+
+## Rules: Documentation
+
+**After every change that modifies behavior, architecture, APIs, steps, workflows, or configuration:**
+
+1. Update the relevant doc(s) in `docs/` to reflect the change:
+   - `docs/ARCHITECTURE.md` — if components, endpoints, steps, flows, or protocols changed
+   - `docs/CONTRIBUTING.md` — if project structure, dev setup, or git workflow changed
+   - `docs/SETUP.md` — if deployment, configuration, or troubleshooting changed
+2. Update `README.md` if the overview, tech stack, or quick start changed
+3. Update this `CLAUDE.md` if architecture, workflow, or conventions changed
+
+**Do NOT wait to be asked.** Documentation updates are part of the implementation, not a follow-up task. If you add a step, endpoint, component, or config — the docs get updated in the same commit or PR.
+
 ## Git Convention
 
 - Branch: `T3SFIA-{ticket}/{short-description}`

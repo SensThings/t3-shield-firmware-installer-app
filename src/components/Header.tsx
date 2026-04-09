@@ -74,6 +74,7 @@ export default function Header({
           </svg>
         </div>
         <h1 className="text-lg font-semibold text-zinc-100">T3-Shield — Installateur</h1>
+        <span className="text-xs text-zinc-600 ml-1">v{process.env.APP_VERSION}</span>
         {operatorName && (
           <span className="text-sm text-zinc-500 ml-2">| {operatorName}</span>
         )}

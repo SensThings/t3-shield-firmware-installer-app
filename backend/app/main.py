@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +8,11 @@ from .routers import install, sdr_test, settings, cache
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 
-app = FastAPI(title="T3-Shield Installer API", version="2.0.0")
+# Read version from VERSION file (two levels up from app/)
+_version_file = Path(__file__).resolve().parent.parent.parent / "VERSION"
+APP_VERSION = _version_file.read_text().strip() if _version_file.exists() else "dev"
+
+app = FastAPI(title="T3-Shield Installer API", version=APP_VERSION)
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,4 +29,4 @@ app.include_router(cache.router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": APP_VERSION}
