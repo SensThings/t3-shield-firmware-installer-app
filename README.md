@@ -45,6 +45,7 @@ Version displayed in browser header and `GET /health`. See [docs/CONTRIBUTING.md
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Full technical reference — components, protocols, data flows, step-by-step install/SDR flows |
 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | Developer guide — project structure, how to add steps/endpoints, git workflow, CI/CD |
 | [docs/SETUP.md](docs/SETUP.md) | Desktop deployment — prerequisites, installation, configuration, troubleshooting |
+| [docs/DEBUGGING.md](docs/DEBUGGING.md) | Systematic debugging guide — layer-by-layer diagnosis, logs, manual testing |
 
 ## Tech Stack
 

@@ -38,6 +38,7 @@ Raspberry Pi (192.168.137.100)   → install.sh, Docker, firmware, SDR RX
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — Full technical reference
 - **[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)** — Developer guide + git workflow
 - **[docs/SETUP.md](docs/SETUP.md)** — Desktop deployment + troubleshooting
+- **[docs/DEBUGGING.md](docs/DEBUGGING.md)** — Systematic debugging guide (layer-by-layer)
 
 ---
 
@@ -71,6 +72,7 @@ Login → Pre-flight checklist → Serial input → Program (18 steps) → SDR T
    - `docs/ARCHITECTURE.md` — if components, endpoints, steps, flows, or protocols changed
    - `docs/CONTRIBUTING.md` — if project structure, dev setup, or git workflow changed
    - `docs/SETUP.md` — if deployment, configuration, or troubleshooting changed
+   - `docs/DEBUGGING.md` — if new error paths, log locations, or diagnostic commands changed
 2. Update `README.md` if the overview, tech stack, or quick start changed
 3. Update this `CLAUDE.md` if architecture, workflow, or conventions changed
 
