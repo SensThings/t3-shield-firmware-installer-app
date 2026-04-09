@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Settings } from '@/lib/types';
+import { testConnection as apiTestConnection, testGhcr as apiTestGhcr, clearCache as apiClearCache } from '@/lib/api';
 
 interface SettingsPanelProps {
   settings: Settings;
@@ -28,19 +29,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch('/api/settings/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          host: form.deviceIp,
-          username: form.sshUsername,
-          password: form.sshPassword,
-          desktopIp: form.desktopIp,
-          desktopSshUsername: form.desktopSshUsername,
-          desktopSshPassword: form.desktopSshPassword,
-        }),
-      });
-      const data = await res.json();
+      const data = await apiTestConnection(form.deviceIp, form.sshUsername, form.sshPassword);
       setTestResult(data);
     } catch {
       setTestResult({ success: false, message: 'Request failed' });
@@ -53,16 +42,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
     setTestingGhcr(true);
     setGhcrResult(null);
     try {
-      const res = await fetch('/api/settings/test-ghcr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: form.ghcrUsername,
-          token: form.ghcrToken,
-          image: form.firmwareImage,
-        }),
-      });
-      const data = await res.json();
+      const data = await apiTestGhcr(form.ghcrUsername, form.ghcrToken, form.firmwareImage);
       setGhcrResult(data);
     } catch {
       setGhcrResult({ success: false, message: 'Request failed' });
@@ -92,16 +72,6 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-        </div>
-
-        {/* Desktop (workstation) */}
-        <div className="mb-6">
-          <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Desktop (Workstation)</h3>
-          <div className="space-y-3 bg-zinc-800/50 rounded-lg p-4">
-            <Field label="Desktop IP" value={form.desktopIp} onChange={v => update('desktopIp', v)} placeholder="IP of the workstation with B210 + Ethernet" />
-            <Field label="Desktop SSH Username" value={form.desktopSshUsername} onChange={v => update('desktopSshUsername', v)} />
-            <Field label="Desktop SSH Password" value={form.desktopSshPassword} onChange={v => update('desktopSshPassword', v)} type="password" />
-          </div>
         </div>
 
         {/* Target Device */}
@@ -179,7 +149,7 @@ export default function SettingsPanel({ settings, onSave, onClose }: SettingsPan
                   setRefreshing(true);
                   setRefreshResult(null);
                   try {
-                    await fetch('/api/cache', { method: 'DELETE' });
+                    await apiClearCache();
                     setRefreshResult('Cache cleared — will re-download on next install');
                   } catch {
                     setRefreshResult('Failed to clear cache');

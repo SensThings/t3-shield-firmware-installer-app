@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Settings } from '@/lib/types';
+import { testConnection } from '@/lib/api';
 
 interface HeaderProps {
   onSettingsClick: () => void;
@@ -19,19 +20,7 @@ export default function Header({ onSettingsClick, settings }: HeaderProps) {
       checkingRef.current = true;
       setChecking(true);
       try {
-        const res = await fetch('/api/settings/test', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            host: settings.deviceIp,
-            username: settings.sshUsername,
-            password: settings.sshPassword,
-            desktopIp: settings.desktopIp,
-            desktopSshUsername: settings.desktopSshUsername,
-            desktopSshPassword: settings.desktopSshPassword,
-          }),
-        });
-        const data = await res.json();
+        const data = await testConnection(settings.deviceIp, settings.sshUsername, settings.sshPassword);
         setConnectionStatus(data.success ? 'connected' : 'disconnected');
       } catch {
         setConnectionStatus('disconnected');

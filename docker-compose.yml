@@ -1,0 +1,30 @@
+services:
+  backend:
+    image: ghcr.io/sensthings/t3s-installer-backend:latest
+    build:
+      context: ./backend
+    network_mode: host
+    privileged: true
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+      - /var/run/docker.sock:/var/run/docker.sock
+      - firmware-cache:/root/.t3shield-installer
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  frontend:
+    image: ghcr.io/sensthings/t3s-installer-frontend:latest
+    build:
+      context: .
+    network_mode: host
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+volumes:
+  firmware-cache:

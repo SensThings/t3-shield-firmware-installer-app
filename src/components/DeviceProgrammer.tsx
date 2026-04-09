@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Settings, StepStatus, InstallStep, INSTALL_STEPS, PREP_STEPS, SDR_PREP_STEPS, SDR_TEST_STEPS, StepUpdateEvent, PrepStepEvent, InstallResult } from '@/lib/types';
+import { startInstall, startSdrTest, subscribeProgress } from '@/lib/api';
 import ProgressChecklist from './ProgressChecklist';
 
 type View = 'idle' | 'serial_input' | 'programming' | 'success' | 'failure';
@@ -104,26 +105,23 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
     setError('');
     setView('programming');
 
-    const apiPath = mode === 'install' ? '/api/install' : '/api/sdr-test';
-    const idKey = mode === 'install' ? 'installId' : 'testId';
     const completeEvent = mode === 'install' ? 'install_complete' : 'test_complete';
     const errorEvent = mode === 'install' ? 'install_error' : 'test_error';
 
     try {
-      const res = await fetch(apiPath, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ serialNumber: trimmed, settings }),
-      });
+      const data = mode === 'install'
+        ? await startInstall(trimmed, settings as unknown as Record<string, string>)
+        : await startSdrTest(trimmed, settings as unknown as Record<string, string>);
 
-      const data = await res.json();
       if (!data.success) {
         setError(data.error || `Failed to start ${mode === 'install' ? 'installation' : 'SDR test'}`);
         setView('failure');
         return;
       }
 
-      const evtSource = new EventSource(`${apiPath}?${idKey}=${data[idKey]}`);
+      const progressId = data.install_id || data.test_id;
+      const progressPath = mode === 'install' ? 'install' : 'sdr-test';
+      const evtSource = subscribeProgress(progressPath, progressId);
 
       evtSource.onmessage = (event) => {
         try {

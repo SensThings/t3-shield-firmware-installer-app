@@ -1,27 +1,18 @@
 export interface Settings {
-  // Desktop (workstation with B210 SDR + Ethernet to Pi)
-  desktopIp: string;
-  desktopSshUsername: string;
-  desktopSshPassword: string;
-  // Target device (Pi connected via desktop's Ethernet)
   deviceIp: string;
   sshUsername: string;
   sshPassword: string;
-  // Container registry (for pulling firmware on server)
   ghcrUsername: string;
   ghcrToken: string;
   firmwareImage: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  desktopIp: '',
-  desktopSshUsername: 'dragon',
-  desktopSshPassword: 'dragon',
   deviceIp: '192.168.137.100',
   sshUsername: 'dragon',
   sshPassword: 'Sensthings@012',
-  ghcrUsername: '',
-  ghcrToken: '',
+  ghcrUsername: 'elmoadin',
+  ghcrToken: 'REPLACE_WITH_YOUR_GHCR_TOKEN',
   firmwareImage: 'ghcr.io/sensthings/t3shield-firmware:latest',
 };
 

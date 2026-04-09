@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+paramiko
+pydantic
+httpx
+python-multipart
