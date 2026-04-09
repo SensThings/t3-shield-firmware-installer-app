@@ -30,7 +30,7 @@ fi
 
 # --- Install Docker ---
 if ! command -v docker &>/dev/null; then
-    echo "[1/7] Installing Docker..."
+    echo "[1/8] Installing Docker..."
     curl -fsSL https://get.docker.com | sudo sh
     sudo usermod -aG docker "$USER"
     echo ""
@@ -38,17 +38,17 @@ if ! command -v docker &>/dev/null; then
     read -p "Press Enter to exit..."
     exit 0
 else
-    echo "[1/7] Docker already installed"
+    echo "[1/8] Docker already installed"
 fi
 
 # --- Install Python deps for backend ---
-echo "[2/7] Installing backend dependencies..."
+echo "[2/8] Installing backend dependencies..."
 sudo apt-get install -y -qq python3-pip python3-paramiko 2>/dev/null || true
 pip3 install --quiet --break-system-packages fastapi uvicorn pydantic httpx python-multipart 2>/dev/null || \
 pip3 install --quiet fastapi uvicorn pydantic httpx python-multipart 2>/dev/null || true
 
 # --- Clone/update backend ---
-echo "[3/7] Setting up backend..."
+echo "[3/8] Setting up backend..."
 sudo mkdir -p "$INSTALL_DIR"
 sudo chown "$USER":"$USER" "$INSTALL_DIR"
 
@@ -86,7 +86,7 @@ sudo systemctl enable t3s-backend >/dev/null 2>&1
 sudo systemctl restart t3s-backend
 
 # --- Login to GHCR and pull frontend ---
-echo "[4/7] Setting up frontend..."
+echo "[4/8] Setting up frontend..."
 echo "$GHCR_TOKEN" | docker login "$REGISTRY" -u "$GHCR_USER" --password-stdin 2>/dev/null
 
 docker stop t3s-frontend 2>/dev/null || true
@@ -103,7 +103,7 @@ docker run -d \
     "$FRONTEND_IMAGE"
 
 # --- Configure Ethernet for Pi access ---
-echo "[5/7] Configuring Ethernet..."
+echo "[5/8] Configuring Ethernet..."
 ETH_IFACE=$(ip -o link show | grep -E 'eth|enp|ens' | head -1 | awk -F: '{print $2}' | tr -d ' ')
 if [ -n "$ETH_IFACE" ]; then
     if ! nmcli con show "Pi-Ethernet" &>/dev/null 2>&1; then
@@ -115,14 +115,51 @@ if [ -n "$ETH_IFACE" ]; then
 fi
 
 # --- USB permissions for SDR ---
-echo "[6/7] Setting USB permissions for SDR..."
+echo "[6/8] Setting USB permissions for SDR..."
 echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="2500", MODE="0666"' | sudo tee /etc/udev/rules.d/99-uhd-usrp.rules >/dev/null
 echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="3923", MODE="0666"' | sudo tee -a /etc/udev/rules.d/99-uhd-usrp.rules >/dev/null
 sudo udevadm control --reload-rules 2>/dev/null || true
 sudo udevadm trigger 2>/dev/null || true
 
+# --- Create desktop shortcuts ---
+echo "[7/8] Creating desktop shortcuts..."
+DESKTOP_DIR=$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")
+mkdir -p "$DESKTOP_DIR"
+
+# Update shortcut
+cat > "$DESKTOP_DIR/T3S-Mise-a-jour.desktop" << DEOF
+[Desktop Entry]
+Name=T3-Shield Mise à jour
+Comment=Mettre à jour l'installateur T3-Shield
+Exec=bash -c 'sudo bash /opt/t3s-installer/t3s-update.sh; echo ""; read -p "Appuyez sur Entrée pour fermer..."'
+Terminal=true
+Type=Application
+Icon=system-software-update
+Categories=Utility;
+DEOF
+chmod +x "$DESKTOP_DIR/T3S-Mise-a-jour.desktop"
+
+# Open installer shortcut
+cat > "$DESKTOP_DIR/T3-Shield-Installateur.desktop" << DEOF
+[Desktop Entry]
+Name=T3-Shield Installateur
+Comment=Ouvrir l'installateur T3-Shield
+Exec=xdg-open http://localhost:3000
+Terminal=false
+Type=Application
+Icon=applications-internet
+Categories=Utility;
+DEOF
+chmod +x "$DESKTOP_DIR/T3-Shield-Installateur.desktop"
+
+# Trust the shortcuts (GNOME)
+gio set "$DESKTOP_DIR/T3S-Mise-a-jour.desktop" metadata::trusted true 2>/dev/null || true
+gio set "$DESKTOP_DIR/T3-Shield-Installateur.desktop" metadata::trusted true 2>/dev/null || true
+
+echo "  Shortcuts created on desktop"
+
 # --- Verify ---
-echo "[7/7] Verifying..."
+echo "[8/8] Verifying..."
 sleep 3
 echo ""
 echo "========================================="

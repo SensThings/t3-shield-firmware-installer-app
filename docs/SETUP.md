@@ -54,13 +54,14 @@ The script runs 7 steps automatically:
 
 | Step | What it does |
 |------|-------------|
-| 1/7 | Install Docker (if missing) |
-| 2/7 | Install Python 3 + backend dependencies |
-| 3/7 | Clone backend code from GitHub → `/opt/t3s-installer/backend/` |
-| 4/7 | Pull and start frontend Docker container |
-| 5/7 | Configure Ethernet adapter (`192.168.137.1/24`) |
-| 6/7 | Set USB permissions for B210 SDR |
-| 7/7 | Verify backend + frontend are running |
+| 1/8 | Install Docker (if missing) |
+| 2/8 | Install Python 3 + backend dependencies |
+| 3/8 | Clone backend code from GitHub → `/opt/t3s-installer/backend/` |
+| 4/8 | Pull and start frontend Docker container |
+| 5/8 | Configure Ethernet adapter (`192.168.137.1/24`) |
+| 6/8 | Set USB permissions for B210 SDR |
+| 7/8 | Create desktop shortcuts |
+| 8/8 | Verify backend + frontend are running |
 
 ### Important: Docker logout/login
 
@@ -76,7 +77,14 @@ This is required because Docker needs the user to be in the `docker` group, whic
 
 ## Step 3: Verify the Installation
 
-After the script finishes, it opens the browser automatically. If not, open:
+After the script finishes, two shortcuts appear on the desktop:
+
+| Shortcut | What it does |
+|----------|-------------|
+| **T3-Shield Installateur** | Opens the app in the browser (http://localhost:3000) |
+| **T3S Mise à jour** | Runs the update script (opens a terminal, asks for sudo password) |
+
+The script also opens the browser automatically. If not, double-click "T3-Shield Installateur" or open:
 
 **http://localhost:3000**
 
