@@ -1,108 +1,157 @@
 # T3-Shield Firmware Installer — Desktop Setup Guide
 
-How to install, configure, and maintain the installer on technician desktops.
+Step-by-step guide to install, configure, and maintain the installer app on technician desktops.
 
 ---
 
-## Requirements
+## Before You Start
 
-| Item | Details |
-|------|---------|
-| Desktop OS | Dragon OS or Ubuntu 22.04+ (x86_64) |
-| Internet | Required for first install (downloads Docker, firmware image). Not needed after. |
-| Ethernet port | For connecting to Pi (direct cable, no switch needed) |
-| USB port | For B210 SDR (only needed for SDR test, not for programming) |
-| Browser | Any modern browser (Chrome, Firefox, Edge) |
+### What you need to prepare
+
+1. **A GitHub Personal Access Token (PAT)** with `read:packages` scope
+   - Go to https://github.com/settings/tokens → Generate new token (classic)
+   - Select scope: `read:packages`
+   - Copy the token (starts with `ghp_...`) — you'll need it twice
+   - The GitHub username is: `elmoadin`
+
+2. **The install script** — copy `deploy/t3s-install.sh` from this repo to a USB drive (or download it on the desktop)
+
+3. **Network access** — the desktop needs internet for the first install (to download Docker, Python packages, and the firmware image). After that, it works offline.
+
+4. **Desktop credentials** — you need `sudo` access on the desktop
+
+5. **Physical setup per desktop:**
+   - Ethernet cable (connects desktop to Pi)
+   - B210 SDR connected via USB to the desktop (only needed for SDR testing, not for programming)
 
 ---
 
-## First-Time Installation
+## Step 1: Edit the Install Script
 
-### 1. Copy the install script to the desktop
+Before running the script, open `t3s-install.sh` in a text editor and replace the GHCR token placeholder:
 
-Transfer `deploy/t3s-install.sh` to the desktop (USB drive, SCP, etc.).
+```bash
+nano t3s-install.sh
+```
 
-### 2. Run the installer
+Find this line near the top:
+
+```
+GHCR_TOKEN="REPLACE_WITH_YOUR_GHCR_TOKEN"
+```
+
+Replace `REPLACE_WITH_YOUR_GHCR_TOKEN` with your actual GitHub PAT. Save and close.
+
+---
+
+## Step 2: Run the Install Script
 
 ```bash
 sudo bash t3s-install.sh
 ```
 
-This script does everything:
-- Installs Docker (if missing)
-- Installs Python 3 + pip
-- Clones the backend from GitHub
-- Creates a systemd service for the backend (`t3s-backend`)
-- Pulls and starts the frontend Docker container (`t3s-frontend`)
-- Configures the Ethernet adapter for Pi connection (`192.168.137.1/24`)
-- Sets up USB udev rules for the B210 SDR
+The script runs 7 steps automatically:
 
-### 3. Verify
+| Step | What it does |
+|------|-------------|
+| 1/7 | Install Docker (if missing) |
+| 2/7 | Install Python 3 + backend dependencies |
+| 3/7 | Clone backend code from GitHub → `/opt/t3s-installer/backend/` |
+| 4/7 | Pull and start frontend Docker container |
+| 5/7 | Configure Ethernet adapter (`192.168.137.1/24`) |
+| 6/7 | Set USB permissions for B210 SDR |
+| 7/7 | Verify backend + frontend are running |
 
-Open a browser to **http://localhost:3000**
+### Important: Docker logout/login
+
+If Docker was not previously installed, the script will install it and then **stop with this message:**
+
+```
+Docker installed. Please LOG OUT and LOG BACK IN, then run this script again.
+```
+
+This is required because Docker needs the user to be in the `docker` group, which only takes effect after a fresh login. **Log out of the desktop session, log back in, then run the script again.** The second run will skip Docker install and continue from step 2.
+
+---
+
+## Step 3: Verify the Installation
+
+After the script finishes, it opens the browser automatically. If not, open:
+
+**http://localhost:3000**
 
 You should see the login page. Login with:
-- Username: `op`
-- Password: `123`
+- Username: **op**
+- Password: **123**
 
----
-
-## Network Setup
-
-The desktop connects to the Pi via a direct Ethernet cable. The install script configures this automatically, but if you need to set it up manually:
-
-### Desktop Ethernet (static IP)
-
-```
-IP: 192.168.137.1
-Netmask: 255.255.255.0
-Gateway: (none)
-```
-
-On Dragon OS / Ubuntu:
+You can also verify the backend directly:
 
 ```bash
-sudo nmcli connection add type ethernet \
-  con-name "Pi-Ethernet" \
-  ifname eth0 \
-  ipv4.addresses 192.168.137.1/24 \
-  ipv4.method manual
+curl http://localhost:8000/health
 ```
 
-Replace `eth0` with your actual Ethernet interface name (`ip link show` to list).
-
-### Pi (expected)
-
-The Pi should already be configured with:
-
-```
-IP: 192.168.137.100
-User: dragon
-Password: Sensthings@012
-```
+Expected: `{"status":"ok","version":"1.0.0"}`
 
 ---
 
-## Configuration
+## Step 4: Configure Settings (First Time Per Browser)
 
-### First-time settings
+This is **mandatory** — the app won't work without SSH and GHCR credentials.
 
-After logging in, click the gear icon (Paramètres) and configure:
+After logging in, click the **gear icon** (top right) to open Settings.
+
+Fill in:
 
 | Setting | Value | Notes |
 |---------|-------|-------|
-| Adresse IP | `192.168.137.100` | Default, change only if Pi has different IP |
-| Utilisateur SSH | `dragon` | Default Dragon OS user |
-| Mot de passe SSH | `Sensthings@012` | Default password |
-| Utilisateur GHCR | Your GitHub username | Needs `read:packages` access to `ghcr.io/sensthings` |
-| Jeton GHCR | GitHub PAT | Token with `read:packages` scope |
-| Image firmware | `ghcr.io/sensthings/t3shield-firmware:latest` | Change to pin a specific version |
+| Adresse IP | `192.168.137.100` | Default — only change if Pi has a different IP |
+| Utilisateur SSH | `dragon` | Default Dragon OS user on the Pi |
+| Mot de passe SSH | `Sensthings@012` | Default password on the Pi |
+| Utilisateur GHCR | `elmoadin` | GitHub username for container registry |
+| Jeton GHCR | `ghp_...` | The same PAT you used in the install script |
+| Image firmware | `ghcr.io/sensthings/t3shield-firmware:latest` | Default — change to pin a specific version |
 
-Click **Tester la connexion** to verify SSH works.
-Click **Tester GHCR** to verify registry access.
-Click **Enregistrer** to save.
+Then:
+1. Click **Tester la connexion** — should show a green checkmark (requires a Pi to be connected)
+2. Click **Tester GHCR** — should show a green checkmark
+3. Click **Enregistrer**
 
-Settings are stored in the browser's localStorage.
+Settings are saved in the browser's localStorage. If the browser cache is cleared, you'll need to re-enter them.
+
+---
+
+## Step 5: Edit the Update Script (One Time)
+
+The update script also needs the GHCR token. Edit it:
+
+```bash
+nano /opt/t3s-installer/t3s-update.sh
+```
+
+Find `GHCR_TOKEN="REPLACE_WITH_YOUR_GHCR_TOKEN"` and replace with the same PAT. Save.
+
+This only needs to be done once per desktop.
+
+---
+
+## Setting Up Multiple Desktops
+
+If you're setting up 10+ desktops, here's the efficient workflow:
+
+1. **Prepare once:**
+   - Edit `t3s-install.sh` with the real GHCR token
+   - Copy it to a USB drive
+
+2. **Per desktop:**
+   - Plug in USB drive
+   - Copy `t3s-install.sh` to the desktop
+   - Run `sudo bash t3s-install.sh` (logout/login if Docker wasn't installed)
+   - Open browser → login → configure Settings → save
+   - Edit `/opt/t3s-installer/t3s-update.sh` with the GHCR token
+   - Connect a Pi, program one device to verify everything works
+   - Move to next desktop
+
+3. **Estimated time per desktop:** 10-15 minutes (mostly waiting for Docker/firmware download). Faster if the desktop already has Docker.
 
 ---
 
@@ -158,6 +207,55 @@ If only the firmware image changed (not the installer app):
 2. Click **Rafraichir l'image**
 3. Program the next device — the new image will be downloaded and cached
 
+### Updating all desktops at once
+
+You can SSH into each desktop remotely:
+
+```bash
+for host in 10.87.126.249 10.87.126.250 10.87.126.251; do
+  echo "Updating $host..."
+  ssh user@$host "sudo bash /opt/t3s-installer/t3s-update.sh" &
+done
+wait
+echo "All desktops updated."
+```
+
+---
+
+## Network Setup
+
+The desktop connects to the Pi via a direct Ethernet cable. The install script configures this automatically, but if you need to set it up manually:
+
+### Desktop Ethernet (static IP)
+
+```
+IP: 192.168.137.1
+Netmask: 255.255.255.0
+Gateway: (none)
+```
+
+On Dragon OS / Ubuntu:
+
+```bash
+sudo nmcli connection add type ethernet \
+  con-name "Pi-Ethernet" \
+  ifname eth0 \
+  ipv4.addresses 192.168.137.1/24 \
+  ipv4.method manual
+```
+
+Replace `eth0` with your actual Ethernet interface name (`ip link show` to list).
+
+### Pi (expected)
+
+The Pi should already be configured with:
+
+```
+IP: 192.168.137.100
+User: dragon
+Password: Sensthings@012
+```
+
 ---
 
 ## Service Management
@@ -171,8 +269,11 @@ sudo systemctl status t3s-backend
 # Restart
 sudo systemctl restart t3s-backend
 
-# Logs
+# Logs (live)
 sudo journalctl -u t3s-backend -f
+
+# Logs (last 50 lines)
+sudo journalctl -u t3s-backend -n 50
 ```
 
 ### Frontend (Docker)
@@ -201,7 +302,7 @@ docker logs -f t3s-frontend
 5. Complete the pre-flight checklist (all items must be "Oui")
 6. Enter the serial number from the device label
 7. Click **Démarrer**
-8. Wait for all 18 steps to complete (typically 5-10 minutes)
+8. Wait for all 18 steps to complete (typically 5-10 minutes, first device is slower due to file caching)
 9. If PASS: click **Appareil suivant** for the next device
 10. If FAIL: check the error message, fix the issue, click **Réessayer**
 
@@ -220,11 +321,16 @@ docker logs -f t3s-frontend
 
 ### "Appareil injoignable" (device unreachable)
 
-- Check the Ethernet cable is connected
-- Check the Pi is powered on (green LED)
+- Check the Ethernet cable is connected at both ends
+- Check the Pi is powered on (green LED visible)
 - Verify the desktop Ethernet IP is `192.168.137.1/24`:
   ```bash
   ip addr show | grep 192.168.137
+  ```
+  If missing, re-run the network setup:
+  ```bash
+  ETH=$(ip -o link show | grep -E 'eth|enp|ens' | head -1 | awk -F: '{print $2}' | tr -d ' ')
+  sudo nmcli con add type ethernet con-name "Pi-Ethernet" ifname "$ETH" ip4 192.168.137.1/24
   ```
 - Try pinging the Pi:
   ```bash
@@ -241,15 +347,17 @@ docker logs -f t3s-frontend
 - SSH into the Pi and clean up:
   ```bash
   ssh dragon@192.168.137.100
-  sudo rm -f /usr/local/bin/docker*
-  sudo rm -f /usr/local/bin/containerd*
+  sudo rm -f /usr/local/bin/docker* /usr/local/bin/containerd*
+  sudo rm -f /etc/systemd/system/docker.service /etc/systemd/system/containerd.service
+  sudo systemctl daemon-reload
   ```
 - Retry the install
 
 ### Install fails at "Télécharger l'image firmware"
 
-- Check the GHCR token is valid (Settings → Tester GHCR)
-- Clear the cache (Settings → Rafraichir l'image) and retry
+- Check the GHCR token is valid: Settings → **Tester GHCR**
+- If it fails, the token may have expired — generate a new one at https://github.com/settings/tokens
+- Clear the cache: Settings → **Rafraichir l'image** → retry
 - Check Docker is running on the desktop:
   ```bash
   docker info
@@ -258,26 +366,31 @@ docker logs -f t3s-frontend
 ### Install fails at "Vérification de santé"
 
 - The firmware container started but isn't responding
-- SSH into the Pi and check:
+- SSH into the Pi and check the container logs:
   ```bash
   ssh dragon@192.168.137.100
   sudo docker logs t3shield-firmware
+  ```
+- If the container exited, check:
+  ```bash
+  sudo docker ps -a | grep t3shield
   ```
 
 ### SDR test fails at "Vérifier le SDR du poste"
 
 - The desktop B210 SDR is not detected
-- Check USB connection
+- Check USB connection (try a different port)
 - Verify UHD tools are installed:
   ```bash
   uhd_find_devices
   ```
+- If not installed: `sudo apt install uhd-host`
 
 ### SDR test fails at "Initialiser le récepteur SDR"
 
 - The Pi's B210 SDR is not detected
 - Unplug and replug the SDR USB cable on the Pi
-- Retry the test
+- Wait 10 seconds (FPGA initialization), then retry
 
 ### Backend won't start
 
@@ -286,8 +399,14 @@ sudo journalctl -u t3s-backend -n 50
 ```
 
 Common causes:
-- Python dependencies missing → `cd /opt/t3s-installer/backend && pip install -r requirements.txt`
-- Port 8000 already in use → `sudo lsof -i :8000`
+- **Python dependencies missing:**
+  ```bash
+  cd /opt/t3s-installer/backend && pip3 install -r requirements.txt
+  ```
+- **Port 8000 already in use:**
+  ```bash
+  sudo lsof -i :8000
+  ```
 
 ### Frontend shows blank page
 
@@ -297,7 +416,14 @@ docker logs t3s-frontend
 
 Common causes:
 - Port 3000 already in use
-- Backend not running (frontend can't reach `localhost:8000`)
+- Backend not running — the page loads but API calls fail. Check with:
+  ```bash
+  curl http://localhost:8000/health
+  ```
+
+### Settings lost after browser update
+
+Settings are stored in localStorage. If the browser clears its data (update, privacy settings), you'll need to re-enter the SSH and GHCR credentials in Settings. This is by design — credentials are not stored on the server.
 
 ---
 
@@ -306,6 +432,7 @@ Common causes:
 | Path | Contents |
 |------|----------|
 | `/opt/t3s-installer/backend/` | Backend source code |
-| `/opt/t3s-installer/t3s-update.sh` | Update script |
+| `/opt/t3s-installer/t3s-update.sh` | Update script (contains GHCR token) |
+| `/opt/t3s-installer/VERSION` | Current installed version |
 | `~/.t3shield-installer/` | Firmware cache (Docker binaries, firmware tar) |
 | Browser localStorage | SSH settings, GHCR credentials, auth state |

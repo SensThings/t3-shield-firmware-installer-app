@@ -52,14 +52,15 @@ echo "[3/7] Setting up backend..."
 sudo mkdir -p "$INSTALL_DIR"
 sudo chown "$USER":"$USER" "$INSTALL_DIR"
 
-if [ -d "$INSTALL_DIR/backend/.git" ]; then
-    cd "$INSTALL_DIR/backend" && git pull --quiet 2>/dev/null || true
-else
-    rm -rf "$INSTALL_DIR/repo" "$INSTALL_DIR/backend"
-    git clone --quiet --depth 1 "$BACKEND_REPO" "$INSTALL_DIR/repo" 2>/dev/null
-    mv "$INSTALL_DIR/repo/backend" "$INSTALL_DIR/backend"
-    rm -rf "$INSTALL_DIR/repo"
+rm -rf "$INSTALL_DIR/repo" "$INSTALL_DIR/backend.old"
+git clone --quiet --depth 1 "$BACKEND_REPO" "$INSTALL_DIR/repo" 2>/dev/null
+if [ -d "$INSTALL_DIR/backend" ]; then
+    mv "$INSTALL_DIR/backend" "$INSTALL_DIR/backend.old"
 fi
+mv "$INSTALL_DIR/repo/backend" "$INSTALL_DIR/backend"
+cp "$INSTALL_DIR/repo/VERSION" "$INSTALL_DIR/VERSION" 2>/dev/null || true
+cp "$INSTALL_DIR/repo/deploy/t3s-update.sh" "$INSTALL_DIR/t3s-update.sh" 2>/dev/null || true
+rm -rf "$INSTALL_DIR/repo" "$INSTALL_DIR/backend.old"
 
 # Create systemd service for backend
 sudo tee /etc/systemd/system/t3s-backend.service >/dev/null << SVCEOF

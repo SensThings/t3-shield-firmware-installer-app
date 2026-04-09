@@ -59,9 +59,18 @@ rm -rf "$INSTALL_DIR/repo" "$INSTALL_DIR/backend.old"
 git clone $CLONE_ARGS "$BACKEND_REPO" "$INSTALL_DIR/repo" 2>&1
 mv "$INSTALL_DIR/backend" "$INSTALL_DIR/backend.old" 2>/dev/null
 mv "$INSTALL_DIR/repo/backend" "$INSTALL_DIR/backend"
-# Keep VERSION file accessible to backend
+# Keep VERSION and update script in install dir
 cp "$INSTALL_DIR/repo/VERSION" "$INSTALL_DIR/VERSION" 2>/dev/null
+cp "$INSTALL_DIR/repo/deploy/t3s-update.sh" "$INSTALL_DIR/t3s-update.sh.new" 2>/dev/null
 rm -rf "$INSTALL_DIR/repo" "$INSTALL_DIR/backend.old"
+# Self-update: replace this script with the new version (preserving GHCR_TOKEN)
+if [ -f "$INSTALL_DIR/t3s-update.sh.new" ]; then
+    OLD_TOKEN=$(grep '^GHCR_TOKEN=' "$INSTALL_DIR/t3s-update.sh" | cut -d'"' -f2)
+    if [ -n "$OLD_TOKEN" ] && [ "$OLD_TOKEN" != "REPLACE_WITH_YOUR_GHCR_TOKEN" ]; then
+        sed -i "s|GHCR_TOKEN=\"REPLACE_WITH_YOUR_GHCR_TOKEN\"|GHCR_TOKEN=\"$OLD_TOKEN\"|" "$INSTALL_DIR/t3s-update.sh.new"
+    fi
+    mv "$INSTALL_DIR/t3s-update.sh.new" "$INSTALL_DIR/t3s-update.sh"
+fi
 sudo systemctl restart t3s-backend
 
 # Update frontend (docker pull)
