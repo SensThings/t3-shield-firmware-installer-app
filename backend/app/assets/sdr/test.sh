@@ -139,7 +139,7 @@ step_run_test() {
 
     # Wait for RX to start streaming (FPGA load can take 15-20s on Pi)
     local init_waited=0
-    while [[ $init_waited -lt 30 ]]; do
+    while [[ $init_waited -lt 120 ]]; do
         if grep -q "Streaming" "$rx_log" 2>/dev/null; then
             log "  [RX] Streaming started after ${init_waited}s"
             break
@@ -153,10 +153,10 @@ step_run_test() {
     done
 
     if [[ $init_waited -ge 30 ]]; then
-        log "  [RX] Init timed out after 30s"
+        log "  [RX] Init timed out after 120s"
         kill -9 "$rx_pid" 2>/dev/null
         wait "$rx_pid" 2>/dev/null
-        echo "SDR receiver initialization timed out (FPGA load)"
+        echo "SDR receiver initialization timed out after 120s (FPGA load)"
         return 1
     fi
 
