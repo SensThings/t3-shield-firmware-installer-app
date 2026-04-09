@@ -26,19 +26,25 @@ Step-by-step guide to install, configure, and maintain the installer app on tech
 
 ## Step 1: Copy the Install Script to the Desktop
 
-From your machine (where you have the repo cloned), send the script via SCP:
+**Option A — via SCP (from your machine):**
 
 ```bash
-scp deploy/t3s-install.sh <user>@<desktop-ip>:~/t3s-install.sh
+scp deploy/t3s-install.sh <user>@<desktop-ip>:~/Desktop/t3s-install.sh
 ```
 
 Example:
 
 ```bash
-scp deploy/t3s-install.sh st2@10.87.126.249:~/t3s-install.sh
+scp deploy/t3s-install.sh st2@10.87.126.249:~/Desktop/t3s-install.sh
 ```
 
-Then SSH into the desktop:
+**Option B — via USB drive:**
+
+Copy `deploy/t3s-install.sh` from the repo to a USB drive, plug it into the desktop, and copy the file to `~/Desktop/`.
+
+---
+
+Then SSH into the desktop (or open a terminal locally):
 
 ```bash
 ssh <user>@<desktop-ip>
@@ -47,7 +53,7 @@ ssh <user>@<desktop-ip>
 Edit the script and replace the GHCR token placeholder:
 
 ```bash
-nano ~/t3s-install.sh
+nano ~/Desktop/t3s-install.sh
 ```
 
 Find this line near the top:
@@ -65,7 +71,7 @@ Replace `REPLACE_WITH_YOUR_GHCR_TOKEN` with your actual GitHub PAT. Save and clo
 (Still on the desktop via SSH)
 
 ```bash
-sudo bash ~/t3s-install.sh
+sudo bash ~/Desktop/t3s-install.sh
 ```
 
 The script runs 8 steps automatically:
@@ -170,11 +176,11 @@ If you're setting up 10+ desktops, here's the efficient workflow:
 
 2. **Per desktop:**
    ```bash
-   # Copy script
-   scp deploy/t3s-install.sh <user>@<desktop-ip>:~/t3s-install.sh
+   # Copy script to desktop
+   scp deploy/t3s-install.sh <user>@<desktop-ip>:~/Desktop/t3s-install.sh
    # SSH in and run
    ssh <user>@<desktop-ip>
-   sudo bash ~/t3s-install.sh
+   sudo bash ~/Desktop/t3s-install.sh
    ```
    - If Docker wasn't installed: logout/login, run again
    - Open browser → login → configure Settings → save

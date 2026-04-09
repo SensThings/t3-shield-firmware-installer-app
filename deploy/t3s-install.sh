@@ -5,8 +5,6 @@
 # Backend runs natively on host (needs UHD/Python)
 # Frontend runs in Docker
 # =============================================================================
-set -e
-
 GHCR_USER="elmoadin"
 GHCR_TOKEN="REPLACE_WITH_YOUR_GHCR_TOKEN"
 REGISTRY="ghcr.io"
@@ -44,8 +42,9 @@ fi
 # --- Install Python deps for backend ---
 echo "[2/8] Installing backend dependencies..."
 sudo apt-get install -y -qq python3-pip python3-paramiko 2>/dev/null || true
-pip3 install --quiet --break-system-packages fastapi uvicorn pydantic httpx python-multipart 2>/dev/null || \
-pip3 install --quiet fastapi uvicorn pydantic httpx python-multipart 2>/dev/null || true
+sudo pip3 install --quiet --break-system-packages fastapi uvicorn pydantic httpx python-multipart 2>/dev/null || \
+sudo pip3 install --quiet fastapi uvicorn pydantic httpx python-multipart 2>/dev/null || \
+pip3 install --quiet --break-system-packages fastapi uvicorn pydantic httpx python-multipart 2>/dev/null || true
 
 # --- Clone/update backend ---
 echo "[3/8] Setting up backend..."
@@ -76,6 +75,7 @@ ExecStart=/usr/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/home/$USER/.local/lib/python3.12/site-packages:/usr/local/lib/python3.12/dist-packages
 
 [Install]
 WantedBy=multi-user.target
@@ -170,3 +170,6 @@ echo "  Open http://localhost:3000"
 echo "========================================="
 
 xdg-open http://localhost:3000 2>/dev/null || true
+
+echo ""
+read -p "Appuyez sur Entrée pour fermer..." 2>/dev/null || true
