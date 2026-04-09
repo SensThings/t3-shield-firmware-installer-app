@@ -35,6 +35,7 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
   const [result, setResult] = useState<InstallResult | null>(null);
   const [sdrMetrics, setSdrMetrics] = useState<SdrMetrics | null>(null);
   const [error, setError] = useState('');
+  const [endTime, setEndTime] = useState(0);
   const serialInputRef = useRef<HTMLInputElement>(null);
 
   const missingCreds = !settings.ghcrUsername || !settings.ghcrToken;
@@ -101,27 +102,18 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
     });
   }, []);
 
-  const startAction = async () => {
-    const trimmed = serialNumber.trim();
-    if (!trimmed || !/^[a-zA-Z0-9]{3,}$/.test(trimmed)) return;
-
-    setSteps(initSteps(mode));
-    setStartTime(Date.now());
-    setResult(null);
-    setSdrMetrics(null);
-    setError('');
-    setView('programming');
-
-    const completeEvent = mode === 'install' ? 'install_complete' : 'test_complete';
-    const errorEvent = mode === 'install' ? 'install_error' : 'test_error';
+  const runAction = async (actionMode: ActionMode, serial: string) => {
+    const completeEvent = actionMode === 'install' ? 'install_complete' : 'test_complete';
+    const errorEvent = actionMode === 'install' ? 'install_error' : 'test_error';
 
     try {
-      const data = mode === 'install'
-        ? await startInstall(trimmed, settings as unknown as Record<string, string>)
-        : await startSdrTest(trimmed, settings as unknown as Record<string, string>);
+      const data = actionMode === 'install'
+        ? await startInstall(serial, settings as unknown as Record<string, string>)
+        : await startSdrTest(serial, settings as unknown as Record<string, string>);
 
       if (!data.success) {
         setError(data.operator_message || data.error || DEFAULT_ERROR);
+        setEndTime(Date.now());
         setView('failure');
         return;
       }
@@ -141,13 +133,16 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
             const r = parsed.data;
             setResult(r);
             if (r.metrics) setSdrMetrics(r.metrics);
+            setEndTime(Date.now());
             setView(r.result === 'pass' ? 'success' : 'failure');
             evtSource.close();
           } else if (parsed.type === errorEvent) {
             setError(parsed.data.operator_message || parsed.data.error || DEFAULT_ERROR);
+            setEndTime(Date.now());
             setView('failure');
             evtSource.close();
           } else if (parsed.type === 'done') {
+            setEndTime(Date.now());
             if (parsed.data.status === 'failed') {
               setError(parsed.data.operator_message || parsed.data.error || DEFAULT_ERROR);
               setView('failure');
@@ -164,10 +159,25 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
       };
 
       evtSource.onerror = () => evtSource.close();
-    } catch (err) {
+    } catch {
       setError(DEFAULT_ERROR);
+      setEndTime(Date.now());
       setView('failure');
     }
+  };
+
+  const startAction = () => {
+    const trimmed = serialNumber.trim();
+    if (!trimmed || !/^[a-zA-Z0-9]{3,}$/.test(trimmed)) return;
+
+    setSteps(initSteps(mode));
+    setStartTime(Date.now());
+    setEndTime(0);
+    setResult(null);
+    setSdrMetrics(null);
+    setError('');
+    setView('programming');
+    runAction(mode, trimmed);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -190,6 +200,19 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
   };
 
   const retry = () => setView('serial_input');
+
+  const startSdrAfterInstall = () => {
+    const trimmed = serialNumber.trim();
+    setMode('sdr_test');
+    setSteps(initSteps('sdr_test'));
+    setStartTime(Date.now());
+    setEndTime(0);
+    setResult(null);
+    setSdrMetrics(null);
+    setError('');
+    setView('programming');
+    runAction('sdr_test', trimmed);
+  };
 
   const startMode = (m: ActionMode) => {
     setMode(m);
@@ -271,6 +294,13 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
 
   // Success view
   if (view === 'success') {
+    const elapsedSeconds = endTime && startTime ? Math.floor((endTime - startTime) / 1000) : 0;
+    const elapsedMin = Math.floor(elapsedSeconds / 60);
+    const elapsedSec = elapsedSeconds % 60;
+    const elapsedStr = elapsedMin > 0
+      ? `${elapsedMin}m ${elapsedSec.toString().padStart(2, '0')}s`
+      : `${elapsedSec}s`;
+
     return (
       <div className="flex flex-col items-center justify-center flex-1 gap-6">
         <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-8 text-center max-w-md">
@@ -282,6 +312,7 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
           </h2>
           <div className="space-y-2 text-sm text-zinc-400 mb-6">
             <p>Appareil : <span className="text-zinc-200 font-mono">T3S-{serialNumber.trim()}</span></p>
+            <p>Durée : <span className="text-zinc-200 font-mono">{elapsedStr}</span></p>
             {mode === 'install' && result?.version && <p>Firmware : <span className="text-zinc-200">{result.version}</span></p>}
             {mode === 'install' && result?.image && <p>Image : <span className="text-zinc-200 font-mono text-xs">{result.image}</span></p>}
             {mode === 'sdr_test' && sdrMetrics && (
@@ -306,9 +337,20 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
               </div>
             )}
           </div>
-          <button onClick={nextDevice} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors">
-            Appareil suivant
-          </button>
+          {mode === 'install' ? (
+            <div className="flex justify-center gap-3">
+              <button onClick={startSdrAfterInstall} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors">
+                Tester le SDR
+              </button>
+              <button onClick={nextDevice} className="px-5 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-lg font-medium transition-colors">
+                Autre appareil
+              </button>
+            </div>
+          ) : (
+            <button onClick={nextDevice} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors">
+              Appareil suivant
+            </button>
+          )}
         </div>
       </div>
     );
