@@ -160,7 +160,7 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
 
       evtSource.onerror = () => evtSource.close();
     } catch (err) {
-      setError(err instanceof Error ? err.message : DEFAULT_ERROR);
+      setError(DEFAULT_ERROR);
       setView('failure');
     }
   };
