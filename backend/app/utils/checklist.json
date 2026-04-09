@@ -1,6 +1,11 @@
 [
-  {"id": "sdr_desktop_connected", "label": "SDR connecté à l'ordinateur"},
-  {"id": "ethernet_connected", "label": "Câble Ethernet branché à l'appareil"},
-  {"id": "device_powered_on", "label": "Appareil allumé et voyant vert visible"},
-  {"id": "serial_label_visible", "label": "Étiquette du numéro de série visible sur l'appareil"}
+    { "id": "sdr_desktop_connected", "label": "SDR connecté à l'ordinateur" },
+    {
+        "id": "ethernet_connected",
+        "label": "Câble Ethernet branché à l'ordinateur"
+    },
+    {
+        "id": "serial_label_visible",
+        "label": "Étiquette du numéro de série visible sur l'appareil"
+    }
 ]

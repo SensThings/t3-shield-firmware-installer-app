@@ -175,23 +175,70 @@ Browser → api.ts → FastAPI routers → services → SSH → Pi
 - Project key: **T3SFIA**
 - Every change needs a Jira ticket
 
-### Branching
+### Full workflow: making a change and deploying it
 
+Here's the complete step-by-step from code change to running on desktops:
+
+```bash
+# 1. Make your changes
+#    Edit files in src/, backend/, deploy/, docs/
+
+# 2. Verify frontend builds
+npm run build
+
+# 3. Bump version (MANDATORY on every push)
+#    Patch (x.x.X) for fixes, Minor (x.X.0) for features, Major (X.0.0) for breaking
+echo "1.0.4" > VERSION
+#    Also update package.json version to match:
+#    "version": "1.0.4"
+
+# 4. Stage your changes
+git add -A
+
+# 5. Commit with Jira ticket reference
+git commit -m "T3SFIA-XX: description of what changed"
+
+# 6. Tag the version
+git tag v1.0.4
+
+# 7. Push code + tag together
+git push origin main --tags
+
+# 8. Wait for CI to build (~2 min)
+#    Check: https://github.com/SensThings/t3-shield-firmware-installer-app/actions
+#    Or: gh run list --limit 2
+
+# 9. Update desktops (SSH into each, or have technician double-click the update shortcut)
+ssh user@desktop-ip "sudo bash /opt/t3s-installer/t3s-update.sh"
+
+# 10. Verify
+ssh user@desktop-ip "curl -s http://localhost:8000/health"
+#    Should show: {"status":"ok","version":"1.0.4"}
 ```
-T3SFIA-{ticket}/{short-description}
+
+### Branching convention
+
+For feature branches (optional — small fixes can go directly to main):
+
+```bash
+git checkout -b T3SFIA-42/add-battery-check-step
+# ... make changes ...
+git push origin T3SFIA-42/add-battery-check-step
+# Create PR on GitHub, squash merge to main
 ```
 
-Example: `T3SFIA-42/add-battery-check-step`
-
-### Commits
+### Commit message format
 
 ```
 T3SFIA-{ticket}: {imperative description}
 ```
 
-Example: `T3SFIA-42: add battery level check to install steps`
+Examples:
+- `T3SFIA-42: add battery level check to install steps`
+- `T3SFIA-43: fix SDR test timeout on slow Pi models`
+- `T3SFIA-44: update checklist items`
 
-### Pull Requests
+### Pull Requests (for feature branches)
 
 - Title: `T3SFIA-{ticket}: {description}`
 - Must reference the Jira ticket
@@ -208,7 +255,23 @@ On push to `main` or version tag (`v*`):
 1. **build-backend** — builds `backend/Dockerfile` → pushes `ghcr.io/sensthings/t3s-installer-backend:{latest,version,sha}`
 2. **build-frontend** — builds root `Dockerfile` → pushes `ghcr.io/sensthings/t3s-installer-frontend:{latest,version,sha}`
 
-Both jobs run in parallel. See `.github/workflows/build.yml`.
+Both jobs run in parallel (~2 min). See `.github/workflows/build.yml`.
+
+Check CI status:
+
+```bash
+# From CLI
+gh run list --repo SensThings/t3-shield-firmware-installer-app --limit 3
+
+# Or watch a specific run
+gh run watch <run-id> --repo SensThings/t3-shield-firmware-installer-app
+```
+
+If CI fails, check the logs:
+
+```bash
+gh run view <run-id> --repo SensThings/t3-shield-firmware-installer-app --log-failed
+```
 
 ---
 
@@ -224,15 +287,31 @@ The app uses a single `VERSION` file in the repo root as the source of truth.
 | Backend | Read at startup in `app/main.py` → exposed in `GET /health` |
 | Update script | Compares local vs remote version, shows before/after |
 
+**Every push to main MUST bump the version.** The update script compares versions — same version = no update detected.
+
 ### Releasing a new version
 
-1. Update `VERSION` to the new version (e.g. `1.1.0`)
-2. Update `version` in `package.json` to match
-3. Commit: `T3SFIA-XX: bump version to 1.1.0`
-4. Tag: `git tag v1.1.0`
-5. Push: `git push origin main --tags`
-6. CI builds images tagged `v1.1.0` + `latest`
-7. Update desktops: `bash t3s-update.sh`
+```bash
+# 1. Bump version
+echo "1.1.0" > VERSION
+# 2. Update package.json to match
+#    "version": "1.1.0"
+
+# 3. Commit
+git add VERSION package.json
+git commit -m "T3SFIA-XX: bump version to 1.1.0"
+
+# 4. Tag
+git tag v1.1.0
+
+# 5. Push everything
+git push origin main --tags
+
+# 6. Wait for CI (check with: gh run list --limit 2)
+
+# 7. Update desktops
+ssh user@desktop-ip "sudo bash /opt/t3s-installer/t3s-update.sh"
+```
 
 ### Update script options
 
@@ -241,6 +320,17 @@ bash t3s-update.sh              # Update if new version available
 bash t3s-update.sh --check      # Show current vs latest, don't update
 bash t3s-update.sh --force      # Update even if already on latest
 bash t3s-update.sh v1.2.0       # Update to a specific version
+```
+
+### Updating all desktops at once
+
+```bash
+for host in 10.87.126.249 10.87.126.250 10.87.126.251; do
+  echo "Updating $host..."
+  ssh user@$host "sudo bash /opt/t3s-installer/t3s-update.sh" &
+done
+wait
+echo "All desktops updated."
 ```
 
 ### To update desktops after a push
