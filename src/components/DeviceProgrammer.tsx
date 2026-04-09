@@ -21,11 +21,12 @@ interface SdrMetrics {
 
 interface DeviceProgrammerProps {
   settings: Settings;
+  onDeviceProgrammed?: () => void;
 }
 
 const DEFAULT_ERROR = 'Une erreur est survenue. Réessayez ou signalez au responsable.';
 
-export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
+export default function DeviceProgrammer({ settings, onDeviceProgrammed }: DeviceProgrammerProps) {
   const [view, setView] = useState<View>('idle');
   const [mode, setMode] = useState<ActionMode>('install');
   const [serialNumber, setSerialNumber] = useState('');
@@ -178,6 +179,11 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
     setError('');
   };
 
+  const nextDevice = () => {
+    onDeviceProgrammed?.();
+    reset();
+  };
+
   const retry = () => setView('serial_input');
 
   const startMode = (m: ActionMode) => {
@@ -295,8 +301,8 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
               </div>
             )}
           </div>
-          <button onClick={reset} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors">
-            Autre appareil
+          <button onClick={nextDevice} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors">
+            Appareil suivant
           </button>
         </div>
       </div>

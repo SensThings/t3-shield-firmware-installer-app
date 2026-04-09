@@ -69,3 +69,23 @@ export async function clearCache() {
   const res = await fetch(`${API_BASE}/cache`, { method: 'DELETE' });
   return res.json();
 }
+
+export async function login(username: string, password: string) {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  return res.json();
+}
+
+export interface ChecklistItem {
+  id: string;
+  label: string;
+}
+
+export async function getChecklist(): Promise<ChecklistItem[]> {
+  const res = await fetch(`${API_BASE}/checklist`);
+  const data = await res.json();
+  return data.items || data;
+}

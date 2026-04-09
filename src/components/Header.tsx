@@ -7,9 +7,32 @@ import { testConnection } from '@/lib/api';
 interface HeaderProps {
   onSettingsClick: () => void;
   settings: Settings;
+  operatorName?: string;
+  sessionSeconds?: number;
+  sessionPaused?: boolean;
+  deviceCount?: number;
+  onPauseResume?: () => void;
+  onFinishSession?: () => void;
 }
 
-export default function Header({ onSettingsClick, settings }: HeaderProps) {
+function formatTime(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}h ${m.toString().padStart(2, '0')}m`;
+  return `${m}m ${s.toString().padStart(2, '0')}s`;
+}
+
+export default function Header({
+  onSettingsClick,
+  settings,
+  operatorName,
+  sessionSeconds,
+  sessionPaused,
+  deviceCount,
+  onPauseResume,
+  onFinishSession,
+}: HeaderProps) {
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'disconnected'>('unknown');
   const [checking, setChecking] = useState(false);
   const checkingRef = useRef(false);
@@ -40,6 +63,8 @@ export default function Header({ onSettingsClick, settings }: HeaderProps) {
     connectionStatus === 'disconnected' ? 'Appareil injoignable' :
     'Vérification...';
 
+  const hasSession = sessionSeconds !== undefined && sessionSeconds >= 0;
+
   return (
     <header className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900">
       <div className="flex items-center gap-3">
@@ -49,9 +74,51 @@ export default function Header({ onSettingsClick, settings }: HeaderProps) {
           </svg>
         </div>
         <h1 className="text-lg font-semibold text-zinc-100">T3-Shield — Installateur</h1>
+        {operatorName && (
+          <span className="text-sm text-zinc-500 ml-2">| {operatorName}</span>
+        )}
       </div>
 
       <div className="flex items-center gap-4">
+        {/* Session timer + controls */}
+        {hasSession && (
+          <div className="flex items-center gap-3">
+            {/* Device count */}
+            {deviceCount !== undefined && deviceCount > 0 && (
+              <span className="text-sm text-zinc-400">
+                {deviceCount} appareil{deviceCount > 1 ? 's' : ''}
+              </span>
+            )}
+
+            {/* Timer */}
+            <span className={`text-sm font-mono ${sessionPaused ? 'text-amber-400' : 'text-zinc-400'}`}>
+              {formatTime(sessionSeconds!)}
+              {sessionPaused && ' (pause)'}
+            </span>
+
+            {/* Pause/Resume */}
+            {onPauseResume && (
+              <button
+                onClick={onPauseResume}
+                className="px-2.5 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-md transition-colors border border-zinc-700"
+              >
+                {sessionPaused ? 'Reprendre' : 'Pause'}
+              </button>
+            )}
+
+            {/* Finish */}
+            {onFinishSession && (
+              <button
+                onClick={onFinishSession}
+                className="px-2.5 py-1 text-xs bg-red-900/50 hover:bg-red-900 text-red-300 rounded-md transition-colors border border-red-800/50"
+              >
+                Terminer
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Connection status */}
         <div className="flex items-center gap-2 text-sm text-zinc-400" title={statusLabel}>
           <div
             className={`w-2.5 h-2.5 rounded-full ${
