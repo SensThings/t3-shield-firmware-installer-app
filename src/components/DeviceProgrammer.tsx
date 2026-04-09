@@ -67,7 +67,12 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
   const handlePrepStep = useCallback((update: PrepStepEvent) => {
     setSteps(prev => prev.map(s =>
       s.source === 'prep' && s.id === update.step_id
-        ? { ...s, status: update.status, message: update.operator_message || update.message }
+        ? {
+            ...s,
+            status: update.status,
+            message: update.operator_message || update.message,
+            startedAt: update.status === 'in_progress' ? Date.now() : s.startedAt,
+          }
         : s
     ));
   }, []);
