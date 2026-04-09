@@ -210,6 +210,39 @@ On push to `main` or version tag (`v*`):
 
 Both jobs run in parallel. See `.github/workflows/build.yml`.
 
+---
+
+## Versioning
+
+The app uses a single `VERSION` file in the repo root as the source of truth.
+
+| Where | How it's used |
+|-------|---------------|
+| `VERSION` | Single source of truth (e.g. `1.0.0`) |
+| `package.json` | Must match `VERSION` |
+| Frontend | Read at build time via `next.config.ts` → displayed in Header |
+| Backend | Read at startup in `app/main.py` → exposed in `GET /health` |
+| Update script | Compares local vs remote version, shows before/after |
+
+### Releasing a new version
+
+1. Update `VERSION` to the new version (e.g. `1.1.0`)
+2. Update `version` in `package.json` to match
+3. Commit: `T3SFIA-XX: bump version to 1.1.0`
+4. Tag: `git tag v1.1.0`
+5. Push: `git push origin main --tags`
+6. CI builds images tagged `v1.1.0` + `latest`
+7. Update desktops: `bash t3s-update.sh`
+
+### Update script options
+
+```bash
+bash t3s-update.sh              # Update if new version available
+bash t3s-update.sh --check      # Show current vs latest, don't update
+bash t3s-update.sh --force      # Update even if already on latest
+bash t3s-update.sh v1.2.0       # Update to a specific version
+```
+
 ### To update desktops after a push
 
 SSH into the desktop and run:

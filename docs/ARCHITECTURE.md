@@ -252,6 +252,21 @@ Cache is populated on first install. Subsequent installs skip download. Use "Raf
 
 ---
 
+## Versioning
+
+A single `VERSION` file in the repo root (e.g. `1.0.0`) is the source of truth.
+
+```
+VERSION file
+  ├─→ next.config.ts reads at build time → process.env.APP_VERSION → Header displays "v1.0.0"
+  ├─→ backend/app/main.py reads at startup → GET /health returns {"version": "1.0.0"}
+  └─→ deploy/t3s-update.sh reads local VERSION, compares to latest git tag
+```
+
+The update script (`t3s-update.sh`) checks current vs latest by listing remote git tags, and only updates if a newer version exists (unless `--force` is used). It supports pinning to a specific version tag.
+
+---
+
 ## Error Handling
 
 All errors surfaced to the operator are in **French**, loaded from `error_messages.json`.

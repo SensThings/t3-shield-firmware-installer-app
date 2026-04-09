@@ -108,19 +108,47 @@ Settings are stored in the browser's localStorage.
 
 ## Updating
 
-When a new version is pushed to GitHub:
+### Check current version
+
+The version is visible in two places:
+- **Browser:** shown in the header next to "T3-Shield — Installateur" (e.g. `v1.0.0`)
+- **Backend API:** `curl http://localhost:8000/health` → `{"status": "ok", "version": "1.0.0"}`
+
+### Check if an update is available
+
+```bash
+bash /opt/t3s-installer/t3s-update.sh --check
+```
+
+Output: `Current version: v1.0.0` / `Latest version: v1.1.0` / `Update available.`
+
+### Update to latest
 
 ```bash
 sudo bash /opt/t3s-installer/t3s-update.sh
 ```
 
 This:
-1. Re-clones the backend code from GitHub
-2. Restarts the backend service
-3. Pulls the latest frontend Docker image
-4. Restarts the frontend container
+1. Compares current vs latest version
+2. Re-clones the backend code from GitHub
+3. Restarts the backend service
+4. Pulls the latest frontend Docker image
+5. Restarts the frontend container
+6. Shows: `v1.0.0 → v1.1.0`
 
 Then refresh the browser.
+
+### Update to a specific version
+
+```bash
+sudo bash /opt/t3s-installer/t3s-update.sh v1.0.0
+```
+
+### Force update (even if already on latest)
+
+```bash
+sudo bash /opt/t3s-installer/t3s-update.sh --force
+```
 
 ### Update the firmware image only
 

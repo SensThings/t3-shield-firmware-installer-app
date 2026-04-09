@@ -31,9 +31,12 @@ Login: `op` / `123`
 ## Desktop Deployment
 
 ```bash
-sudo bash deploy/t3s-install.sh     # First-time setup
-sudo bash /opt/t3s-installer/t3s-update.sh  # Update to latest
+sudo bash deploy/t3s-install.sh          # First-time setup
+bash /opt/t3s-installer/t3s-update.sh --check  # Check for updates
+sudo bash /opt/t3s-installer/t3s-update.sh     # Update to latest
 ```
+
+Version displayed in browser header and `GET /health`. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md#versioning) for release workflow.
 
 ## Documentation
 
