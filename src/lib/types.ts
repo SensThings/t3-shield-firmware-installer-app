@@ -69,15 +69,16 @@ export interface InstallResult {
   }[];
 }
 
+// Backend sends snake_case
 export interface StepUpdateEvent {
-  stepNumber: number;
+  step_number: number;
   status: StepStatus;
   message?: string;
   duration?: number;
 }
 
 export interface PrepStepEvent {
-  stepId: string;
+  step_id: string;
   status: StepStatus;
   message?: string;
 }

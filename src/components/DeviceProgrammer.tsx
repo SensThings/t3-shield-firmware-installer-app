@@ -63,7 +63,7 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
 
   const handlePrepStep = useCallback((update: PrepStepEvent) => {
     setPrepSteps(prev => prev.map(s =>
-      s.id === update.stepId
+      s.id === update.step_id
         ? { ...s, status: update.status, message: update.message }
         : s
     ));
@@ -72,7 +72,7 @@ export default function DeviceProgrammer({ settings }: DeviceProgrammerProps) {
   const handleStepUpdate = useCallback((update: StepUpdateEvent) => {
     setSteps(prev => {
       const next = [...prev];
-      const idx = update.stepNumber - 1;
+      const idx = update.step_number - 1;
       if (idx >= 0 && idx < next.length) {
         next[idx] = {
           ...next[idx],
