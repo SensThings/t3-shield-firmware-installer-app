@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { InstallStep } from '@/lib/types';
 
 interface ProgressChecklistProps {
@@ -12,15 +12,15 @@ interface ProgressChecklistProps {
 
 export default function ProgressChecklist({ steps, serialNumber, startTime, mode }: ProgressChecklistProps) {
   const [elapsed, setElapsed] = useState(0);
+  const allDone = steps.every(s => s.status === 'pass' || s.status === 'fail' || s.status === 'skipped');
 
   useEffect(() => {
+    if (allDone) return;
     const interval = setInterval(() => {
       setElapsed((Date.now() - startTime) / 1000);
     }, 100);
     return () => clearInterval(interval);
-  }, [startTime]);
-
-  const allDone = steps.every(s => s.status === 'pass' || s.status === 'fail' || s.status === 'skipped');
+  }, [startTime, allDone]);
 
   return (
     <div className="w-full max-w-xl">
@@ -48,11 +48,16 @@ export default function ProgressChecklist({ steps, serialNumber, startTime, mode
   );
 }
 
-function StepRow({ step }: { step: InstallStep }) {
+const StepRow = memo(function StepRow({ step }: { step: InstallStep }) {
   const [liveElapsed, setLiveElapsed] = useState(0);
 
   useEffect(() => {
-    if (step.status !== 'in_progress' || !step.startedAt) return;
+    if (step.status !== 'in_progress' || !step.startedAt) {
+      setLiveElapsed(0);
+      return;
+    }
+    // Tick immediately, then every 100ms
+    setLiveElapsed((Date.now() - step.startedAt) / 1000);
     const interval = setInterval(() => {
       setLiveElapsed((Date.now() - step.startedAt!) / 1000);
     }, 100);
@@ -108,7 +113,7 @@ function StepRow({ step }: { step: InstallStep }) {
           {step.status === 'pass' && step.duration !== undefined && (
             <span className="text-xs text-zinc-500 font-mono">{step.duration.toFixed(1)}s</span>
           )}
-          {step.status === 'in_progress' && (
+          {step.status === 'in_progress' && liveElapsed > 0 && (
             <span className="text-xs text-amber-500 font-mono">{liveElapsed.toFixed(1)}s...</span>
           )}
         </div>
@@ -124,4 +129,4 @@ function StepRow({ step }: { step: InstallStep }) {
       </div>
     </div>
   );
-}
+});
