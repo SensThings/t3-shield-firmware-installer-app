@@ -47,6 +47,10 @@ next-env.d.ts
 __pycache__/
 *.pyc
 
+# screenshots and playwright artifacts
+screenshots/
+.playwright-mcp/
+
 # local dev artifacts
 INITIAL_PROMPT.md
 sdr_ui_test-master/
