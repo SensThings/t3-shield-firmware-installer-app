@@ -61,9 +61,17 @@ async def get_checklist():
     return load_checklist()
 
 
+USERS = {
+    "op": {"password": "123", "role": "op", "name": "Opérateur"},
+    "antenna": {"password": "123", "role": "antenna", "name": "Testeur antennes"},
+}
+
+
 @router.post("/auth/login")
 async def login(credentials: dict):
-    # Hardcoded for now — will be replaced with real auth
-    if credentials.get("username") == "op" and credentials.get("password") == "123":
-        return {"success": True, "operator_id": "op", "name": "Opérateur"}
+    username = credentials.get("username", "")
+    password = credentials.get("password", "")
+    user = USERS.get(username)
+    if user and user["password"] == password:
+        return {"success": True, "role": user["role"], "name": user["name"]}
     return {"success": False, "message": "Identifiants incorrects"}

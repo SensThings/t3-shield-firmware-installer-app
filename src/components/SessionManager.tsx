@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Settings } from '@/lib/types';
+import { UserRole } from '@/lib/auth';
 import PreflightChecklist from './PreflightChecklist';
 import DeviceProgrammer from './DeviceProgrammer';
 
@@ -10,12 +11,13 @@ type SessionPhase = 'checklist' | 'active';
 interface SessionManagerProps {
   settings: Settings;
   operatorName: string;
+  role?: UserRole;
   paused: boolean;
   onSessionTimer: (seconds: number) => void;
   onDeviceCount: (count: number) => void;
 }
 
-export default function SessionManager({ settings, operatorName, paused, onSessionTimer, onDeviceCount }: SessionManagerProps) {
+export default function SessionManager({ settings, operatorName, role = 'op', paused, onSessionTimer, onDeviceCount }: SessionManagerProps) {
   const [phase, setPhase] = useState<SessionPhase>('checklist');
   const [deviceCount, setDeviceCount] = useState(0);
   const sessionStartRef = useRef(0);
@@ -70,6 +72,7 @@ export default function SessionManager({ settings, operatorName, paused, onSessi
   return (
     <DeviceProgrammer
       settings={settings}
+      role={role}
       onDeviceProgrammed={incrementDeviceCount}
     />
   );

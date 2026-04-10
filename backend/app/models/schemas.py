@@ -22,6 +22,11 @@ class SdrTestRequest(BaseModel):
     dual_channel: bool = True
 
 
+class AntennaTestRequest(BaseModel):
+    label: str = ""
+    dual_channel: bool = True
+
+
 class TestConnectionRequest(BaseModel):
     host: str
     username: str

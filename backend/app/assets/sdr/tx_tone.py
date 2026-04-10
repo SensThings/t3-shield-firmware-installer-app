@@ -22,13 +22,15 @@ def stop(sig, frame):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--channels", type=int, default=1, choices=[1, 2])
+    parser.add_argument("--device", type=str, default="", help="UHD device serial (e.g. 000000544)")
     args = parser.parse_args()
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
     num_channels = args.channels
-    usrp = uhd.usrp.MultiUSRP()
+    dev_args = f"serial={args.device}" if args.device else ""
+    usrp = uhd.usrp.MultiUSRP(dev_args)
     usrp.set_tx_rate(SAMPLE_RATE)
 
     # Configure channel(s)

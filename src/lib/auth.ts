@@ -1,7 +1,10 @@
 const AUTH_KEY = 't3shield-auth';
 
+export type UserRole = 'op' | 'antenna';
+
 interface AuthState {
   username: string;
+  role: UserRole;
   loggedInAt: string;
 }
 
@@ -21,9 +24,9 @@ export function getAuth(): AuthState | null {
   }
 }
 
-export function setAuth(username: string): void {
+export function setAuth(username: string, role: UserRole): void {
   if (typeof window === 'undefined') return;
-  const state: AuthState = { username, loggedInAt: new Date().toISOString() };
+  const state: AuthState = { username, role, loggedInAt: new Date().toISOString() };
   localStorage.setItem(AUTH_KEY, JSON.stringify(state));
 }
 

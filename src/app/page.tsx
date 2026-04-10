@@ -7,7 +7,7 @@ import SessionManager from '@/components/SessionManager';
 import SettingsPanel from '@/components/SettingsPanel';
 import { Settings, DEFAULT_SETTINGS } from '@/lib/types';
 import { loadSettings, saveSettings } from '@/lib/settings';
-import { isLoggedIn, getAuth, clearAuth } from '@/lib/auth';
+import { isLoggedIn, getAuth, clearAuth, UserRole } from '@/lib/auth';
 
 export default function Home() {
   const router = useRouter();
@@ -15,6 +15,7 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [operatorName, setOperatorName] = useState('');
+  const [userRole, setUserRole] = useState<UserRole>('op');
   const [sessionSeconds, setSessionSeconds] = useState(-1);
   const [sessionPaused, setSessionPaused] = useState(false);
   const [deviceCount, setDeviceCount] = useState(0);
@@ -27,6 +28,7 @@ export default function Home() {
     }
     const auth = getAuth();
     setOperatorName(auth?.username || '');
+    setUserRole(auth?.role || 'op');
     setSettings(loadSettings());
     setAuthChecked(true);
   }, [router]);
@@ -86,6 +88,7 @@ export default function Home() {
           key={sessionKey}
           settings={settings}
           operatorName={operatorName}
+          role={userRole}
           paused={sessionPaused}
           onSessionTimer={handleSessionTimer}
           onDeviceCount={handleDeviceCount}

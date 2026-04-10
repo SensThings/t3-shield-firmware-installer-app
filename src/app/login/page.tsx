@@ -22,7 +22,7 @@ export default function LoginPage() {
     try {
       const data = await login(username.trim(), password.trim());
       if (data.success) {
-        setAuth(username.trim());
+        setAuth(username.trim(), data.role || 'op');
         router.push('/');
       } else {
         setError(data.error || 'Identifiants incorrects');

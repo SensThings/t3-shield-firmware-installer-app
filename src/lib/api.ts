@@ -43,6 +43,18 @@ export async function startSdrTest(serialNumber: string, settings: Record<string
   return res.json();
 }
 
+export async function startAntennaTest(label: string, dualChannel: boolean = true) {
+  const res = await fetch(`${API_BASE}/antenna-test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      label,
+      dual_channel: dualChannel,
+    }),
+  });
+  return res.json();
+}
+
 export async function testConnection(host: string, username: string, password: string) {
   const res = await fetch(`${API_BASE}/settings/test`, {
     method: 'POST',

@@ -68,6 +68,17 @@ export const SDR_TEST_STEPS: { id: string; label: string; source: 'prep' | 'inst
   { id: 'validate_results', label: 'Valider les résultats', source: 'install' },
 ];
 
+// Antenna test steps: prep (desktop-side) + test (desktop-side, no SSH)
+export const ANTENNA_TEST_STEPS: { id: string; label: string; source: 'prep' | 'install' }[] = [
+  // Prep phase
+  { id: 'check_desktop_sdrs', label: 'Vérifier les SDR du poste', source: 'prep' },
+  { id: 'start_transmitter', label: 'Démarrer l\'émetteur', source: 'prep' },
+  // Test phase (step_update events)
+  { id: 'start_receiver', label: 'Démarrer le récepteur', source: 'install' },
+  { id: 'capture', label: 'Capturer le signal RF', source: 'install' },
+  { id: 'validate_results', label: 'Valider les résultats', source: 'install' },
+];
+
 export interface InstallResult {
   operation: string;
   image: string;

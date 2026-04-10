@@ -7,7 +7,7 @@ interface ProgressChecklistProps {
   steps: InstallStep[];
   serialNumber: string;
   startTime: number;
-  mode: 'install' | 'sdr_test';
+  mode: 'install' | 'sdr_test' | 'antenna_test';
 }
 
 export default function ProgressChecklist({ steps, serialNumber, startTime, mode }: ProgressChecklistProps) {
@@ -26,7 +26,7 @@ export default function ProgressChecklist({ steps, serialNumber, startTime, mode
     <div className="w-full max-w-xl">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-zinc-100">
-          {mode === 'install' ? 'Programmation' : 'Test SDR'} : T3S-{serialNumber}
+          {mode === 'install' ? 'Programmation' : mode === 'antenna_test' ? 'Test antenne' : 'Test SDR'}{serialNumber ? ` : ${mode === 'antenna_test' ? serialNumber : `T3S-${serialNumber}`}` : ''}
         </h2>
         <span className="text-sm text-zinc-400 font-mono">
           {elapsed.toFixed(1)}s

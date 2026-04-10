@@ -57,6 +57,23 @@
       "freq_error": "Signal détecté à la mauvaise fréquence. Débranchez et rebranchez le câble coaxial, puis réessayez."
     }
   },
+  "antenna_test": {
+    "check_desktop_sdrs": {
+      "fail": "Deux SDR B210 sont nécessaires. Vérifiez que les deux sont connectés en USB."
+    },
+    "start_transmitter": {
+      "fail": "L'émetteur n'a pas pu démarrer. Vérifiez la connexion USB du SDR émetteur."
+    },
+    "start_receiver": {
+      "fail": "Le récepteur n'a pas pu démarrer. Vérifiez la connexion USB du SDR récepteur."
+    },
+    "validate_results": {
+      "fail": "Le test d'antenne a échoué. Vérifiez les connexions des antennes.",
+      "fail_channel_a": "L'antenne du canal A a échoué. Vérifiez la connexion sur le port RX2-A.",
+      "fail_channel_b": "L'antenne du canal B a échoué. Vérifiez la connexion sur le port RX2-B.",
+      "fail_both": "Les deux antennes ont échoué. Vérifiez les connexions et le câble coaxial de l'émetteur."
+    }
+  },
   "connection": {
     "unreachable": "Impossible d'atteindre l'appareil. Vérifiez : 1) Le câble Ethernet est branché. 2) L'appareil est allumé. 3) Le voyant vert du port Ethernet clignote.",
     "auth_failed": "Connexion refusée. Les identifiants de l'appareil ont peut-être changé — vérifiez les Paramètres.",
