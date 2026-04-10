@@ -52,14 +52,16 @@ def main():
         st_args.channels = [0, 1]
         tone_a = (0.8 * np.exp(2j * np.pi * TONE_OFFSET_A * t)).astype(np.complex64)
         tone_b = (0.8 * np.exp(2j * np.pi * TONE_OFFSET_B * t)).astype(np.complex64)
+        # UHD 4.1 requires 2D numpy array, not list of buffers
+        tone_2d = np.vstack([tone_a, tone_b])
         streamer = usrp.get_tx_stream(st_args)
         metadata = uhd.types.TXMetadata()
         print("[TX] Streaming (dual-channel) ...")
         sys.stdout.flush()
         while RUNNING:
-            streamer.send([tone_a, tone_b], metadata)
+            streamer.send(tone_2d, metadata)
         metadata.end_of_burst = True
-        streamer.send([np.zeros(chunk, dtype=np.complex64)] * 2, metadata)
+        streamer.send(np.zeros((2, chunk), dtype=np.complex64), metadata)
     else:
         tone = (0.8 * np.exp(2j * np.pi * TONE_OFFSET_A * t)).astype(np.complex64)
         streamer = usrp.get_tx_stream(st_args)

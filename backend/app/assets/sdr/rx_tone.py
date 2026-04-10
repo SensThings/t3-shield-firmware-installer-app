@@ -99,7 +99,15 @@ def main():
     metadata = uhd.types.RXMetadata()
 
     stream_cmd = uhd.types.StreamCMD(uhd.types.StreamMode.start_cont)
-    stream_cmd.stream_now = True
+    if num_channels > 1:
+        # Multi-channel requires timed start for time alignment
+        import time as _time
+        usrp.set_time_now(uhd.types.TimeSpec(0.0))
+        _time.sleep(0.1)
+        stream_cmd.stream_now = False
+        stream_cmd.time_spec = usrp.get_time_now() + uhd.types.TimeSpec(1.0)
+    else:
+        stream_cmd.stream_now = True
     streamer.issue_stream_cmd(stream_cmd)
 
     chunk_size = streamer.get_max_num_samps()
@@ -112,10 +120,10 @@ def main():
     sys.stderr.flush()
 
     if num_channels == 2:
-        # Dual-channel receive
+        # Dual-channel receive: use 2D numpy array (UHD 4.1 requires this, not list)
         while RUNNING:
-            bufs = [np.zeros(chunk_size, dtype=np.complex64) for _ in range(2)]
-            nrecv = streamer.recv(bufs, metadata)
+            buf2d = np.zeros((2, chunk_size), dtype=np.complex64)
+            nrecv = streamer.recv(buf2d, metadata, timeout=5.0)
             if metadata.error_code == uhd.types.RXMetadataErrorCode.overflow:
                 continue
             if metadata.error_code != uhd.types.RXMetadataErrorCode.none:
@@ -123,7 +131,7 @@ def main():
                 continue
             for ch in range(2):
                 for i in range(nrecv):
-                    rings[ch][ring_positions[ch] % ANALYSIS_SAMPLES] = bufs[ch][i]
+                    rings[ch][ring_positions[ch] % ANALYSIS_SAMPLES] = buf2d[ch][i]
                     ring_positions[ch] += 1
     else:
         # Single-channel receive (original behavior)
