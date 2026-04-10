@@ -116,6 +116,33 @@ export interface InstallErrorEvent {
   operator_message?: string;
 }
 
+// SDR metrics — single channel (flat) or dual channel (per-channel)
+export interface ChannelMetrics {
+  status: string;
+  peak_freq_hz: number;
+  expected_freq_hz: number;
+  freq_error_hz: number;
+  snr_db: number;
+  snr_threshold_db: number;
+  peak_power_db: number;
+  noise_floor_db: number;
+}
+
+export interface SdrMetrics {
+  status: string;
+  // Single-channel fields (flat)
+  peak_freq_hz?: number;
+  expected_freq_hz?: number;
+  freq_error_hz?: number;
+  snr_db?: number;
+  snr_threshold_db?: number;
+  peak_power_db?: number;
+  noise_floor_db?: number;
+  // Dual-channel fields
+  channel_a?: ChannelMetrics;
+  channel_b?: ChannelMetrics;
+}
+
 export interface TestConnectionResult {
   success: boolean;
   message: string;

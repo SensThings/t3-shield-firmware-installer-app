@@ -19,6 +19,7 @@ class InstallRequest(BaseModel):
 class SdrTestRequest(BaseModel):
     serial_number: str
     settings: Settings
+    dual_channel: bool = True
 
 
 class TestConnectionRequest(BaseModel):

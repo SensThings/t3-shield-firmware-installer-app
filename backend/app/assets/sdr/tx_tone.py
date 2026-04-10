@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Continuous tone transmitter via USRP B210. Runs until SIGTERM/SIGINT."""
+"""Continuous tone transmitter via USRP B210. Runs until SIGTERM/SIGINT.
+Supports single-channel (default) or dual-channel mode via --channels flag.
+"""
 
+import argparse
 import signal
 import sys
 import numpy as np
 import uhd
 
-from config import CENTER_FREQ, SAMPLE_RATE, TONE_OFFSET, TX_GAIN
+from config import CENTER_FREQ, SAMPLE_RATE, TONE_OFFSET_A, TONE_OFFSET_B, TX_GAIN
 
 RUNNING = True
 
@@ -17,33 +20,57 @@ def stop(sig, frame):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--channels", type=int, default=1, choices=[1, 2])
+    args = parser.parse_args()
+
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
+    num_channels = args.channels
     usrp = uhd.usrp.MultiUSRP()
     usrp.set_tx_rate(SAMPLE_RATE)
-    usrp.set_tx_freq(uhd.libpyuhd.types.tune_request(CENTER_FREQ))
-    usrp.set_tx_gain(TX_GAIN)
 
-    print(f"[TX] Freq={CENTER_FREQ/1e6:.1f} MHz  Tone={TONE_OFFSET/1e3:.0f} kHz  "
+    # Configure channel(s)
+    for ch in range(num_channels):
+        usrp.set_tx_freq(uhd.libpyuhd.types.tune_request(CENTER_FREQ), ch)
+        usrp.set_tx_gain(TX_GAIN, ch)
+
+    offsets = [TONE_OFFSET_A, TONE_OFFSET_B][:num_channels]
+    labels = ["A", "B"][:num_channels]
+
+    print(f"[TX] Freq={CENTER_FREQ/1e6:.1f} MHz  Channels={num_channels}  "
+          f"Tones={[f'{o/1e3:.0f}kHz' for o in offsets]}  "
           f"Gain={TX_GAIN}  Rate={SAMPLE_RATE/1e6:.1f} MS/s")
 
+    # Generate tone(s)
     chunk = 4096
     t = np.arange(chunk) / SAMPLE_RATE
-    tone = (0.8 * np.exp(2j * np.pi * TONE_OFFSET * t)).astype(np.complex64)
 
     st_args = uhd.usrp.StreamArgs("fc32", "sc16")
-    streamer = usrp.get_tx_stream(st_args)
-    metadata = uhd.types.TXMetadata()
+    if num_channels == 2:
+        st_args.channels = [0, 1]
+        tone_a = (0.8 * np.exp(2j * np.pi * TONE_OFFSET_A * t)).astype(np.complex64)
+        tone_b = (0.8 * np.exp(2j * np.pi * TONE_OFFSET_B * t)).astype(np.complex64)
+        streamer = usrp.get_tx_stream(st_args)
+        metadata = uhd.types.TXMetadata()
+        print("[TX] Streaming (dual-channel) ...")
+        sys.stdout.flush()
+        while RUNNING:
+            streamer.send([tone_a, tone_b], metadata)
+        metadata.end_of_burst = True
+        streamer.send([np.zeros(chunk, dtype=np.complex64)] * 2, metadata)
+    else:
+        tone = (0.8 * np.exp(2j * np.pi * TONE_OFFSET_A * t)).astype(np.complex64)
+        streamer = usrp.get_tx_stream(st_args)
+        metadata = uhd.types.TXMetadata()
+        print("[TX] Streaming ...")
+        sys.stdout.flush()
+        while RUNNING:
+            streamer.send(tone, metadata)
+        metadata.end_of_burst = True
+        streamer.send(np.zeros(chunk, dtype=np.complex64), metadata)
 
-    print("[TX] Streaming ...")
-    sys.stdout.flush()
-
-    while RUNNING:
-        streamer.send(tone, metadata)
-
-    metadata.end_of_burst = True
-    streamer.send(np.zeros(chunk, dtype=np.complex64), metadata)
     print("[TX] Stopped.")
 
 

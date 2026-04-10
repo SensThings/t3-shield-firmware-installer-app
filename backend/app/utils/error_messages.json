@@ -49,6 +49,9 @@
     },
     "validate_results": {
       "fail": "Le test de validation a échoué. Vérifiez les connexions du câble coaxial et réessayez.",
+      "fail_channel_a": "Le canal A du SDR a échoué. Vérifiez le câble SMA du port RX2-A de l'appareil.",
+      "fail_channel_b": "Le canal B du SDR a échoué. Vérifiez le câble SMA du port RX2-B de l'appareil.",
+      "fail_both_channels": "Les deux canaux SDR ont échoué. Vérifiez les connexions coaxiales et les antennes.",
       "no_signal": "Aucun signal détecté. Vérifiez : 1) Le câble coaxial est bien branché des deux côtés. 2) Le bon port est utilisé (RX2 sur l'appareil). 3) Le SDR du poste est connecté en USB.",
       "low_snr": "Signal trop faible. Vérifiez les connexions du câble coaxial — elles sont peut-être desserrées.",
       "freq_error": "Signal détecté à la mauvaise fréquence. Débranchez et rebranchez le câble coaxial, puis réessayez."

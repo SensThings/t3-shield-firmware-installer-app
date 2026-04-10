@@ -5,7 +5,8 @@
 # Runs on the target device via SSH. The desktop runs the transmitter.
 #
 # Usage:
-#   bash /tmp/sdr/test.sh --duration 5 --json 2>&1
+#   bash /tmp/sdr/test.sh --duration 5 --channels 1 --json 2>&1
+#   bash /tmp/sdr/test.sh --duration 5 --channels 2 --json 2>&1
 # =============================================================================
 
 set -uo pipefail
@@ -13,12 +14,14 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 JSON_MODE=false
 CAPTURE_DURATION=5
+NUM_CHANNELS=1
 RESULT_FILE="/tmp/sdr-test-result.json"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --json)     JSON_MODE=true;        shift ;;
-        --duration) CAPTURE_DURATION="$2"; shift 2 ;;
+        --json)      JSON_MODE=true;        shift ;;
+        --duration)  CAPTURE_DURATION="$2"; shift 2 ;;
+        --channels)  NUM_CHANNELS="$2";     shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
@@ -70,7 +73,6 @@ run_step() {
     start_time=$(date +%s%N)
 
     # Run step, capture only the LAST line as the message
-    # UHD dumps lots of info to stderr which we don't want as the step message
     local msg_file="/tmp/sdr-step-msg.txt"
     $step_func > "$msg_file" 2>/dev/null
     local exit_code=$?
@@ -107,7 +109,7 @@ step_init_receiver() {
         export UHD_IMAGES_DIR="$uhd_dir"
     fi
 
-    # Quick check for B210 (allow UHD info output to go to /dev/null)
+    # Quick check for B210
     local devices
     devices=$(uhd_find_devices 2>/dev/null | grep -c "type: b200" || echo 0)
     if [[ "$devices" -lt 1 ]]; then
@@ -115,7 +117,9 @@ step_init_receiver() {
         return 1
     fi
 
-    echo "USRP B210 ready"
+    local mode_label="single"
+    [[ "$NUM_CHANNELS" -eq 2 ]] && mode_label="dual"
+    echo "USRP B210 ready ($mode_label channel)"
     return 0
 }
 
@@ -133,8 +137,8 @@ step_run_test() {
         export UHD_IMAGES_DIR="$uhd_dir"
     fi
 
-    # Run RX: stdout (JSON) → file, stderr (UHD logs) → separate log
-    python3 rx_tone.py > "$json_out" 2>"$rx_log" &
+    # Run RX with channel count
+    python3 rx_tone.py --channels "$NUM_CHANNELS" > "$json_out" 2>"$rx_log" &
     local rx_pid=$!
 
     # Wait for RX to start streaming (FPGA load can take 15-20s on Pi)
@@ -160,7 +164,7 @@ step_run_test() {
         return 1
     fi
 
-    # NOW capture for the specified duration
+    # Capture for the specified duration
     sleep "$CAPTURE_DURATION"
 
     # Stop gracefully with SIGINT (triggers analysis in rx_tone.py)
@@ -175,7 +179,7 @@ step_run_test() {
     kill -9 "$rx_pid" 2>/dev/null
     wait "$rx_pid" 2>/dev/null
 
-    # Debug: show what we got
+    # Debug
     log "  [RX stderr]: $(tail -3 "$rx_log" 2>/dev/null)"
     log "  [RX stdout]: $(cat "$json_out" 2>/dev/null | head -3)"
 
@@ -194,7 +198,9 @@ step_run_test() {
         return 1
     fi
 
-    echo "Captured and analyzed ${CAPTURE_DURATION}s of RF samples"
+    local mode_label="single"
+    [[ "$NUM_CHANNELS" -eq 2 ]] && mode_label="dual"
+    echo "Captured ${CAPTURE_DURATION}s RF ($mode_label channel)"
     return 0
 }
 
@@ -204,25 +210,45 @@ step_validate_results() {
         return 1
     fi
 
-    local status snr freq_error peak_freq
+    local status
     status=$(echo "$RX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])" 2>/dev/null)
-    snr=$(echo "$RX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['snr_db'])" 2>/dev/null)
-    freq_error=$(echo "$RX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['freq_error_hz'])" 2>/dev/null)
-    peak_freq=$(echo "$RX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['peak_freq_hz'])" 2>/dev/null)
 
-    if [[ "$status" == "PASS" ]]; then
-        echo "SNR: ${snr} dB, Freq error: ${freq_error} Hz, Peak: ${peak_freq} Hz"
-        return 0
+    if [[ "$NUM_CHANNELS" -eq 2 ]]; then
+        # Dual-channel: extract per-channel results
+        local status_a status_b snr_a snr_b
+        status_a=$(echo "$RX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['channel_a']['status'])" 2>/dev/null)
+        status_b=$(echo "$RX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['channel_b']['status'])" 2>/dev/null)
+        snr_a=$(echo "$RX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['channel_a']['snr_db'])" 2>/dev/null)
+        snr_b=$(echo "$RX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['channel_b']['snr_db'])" 2>/dev/null)
+
+        if [[ "$status" == "PASS" ]]; then
+            echo "A: ${status_a} (SNR ${snr_a} dB) | B: ${status_b} (SNR ${snr_b} dB)"
+            return 0
+        else
+            echo "A: ${status_a} (SNR ${snr_a} dB) | B: ${status_b} (SNR ${snr_b} dB) — test failed"
+            return 1
+        fi
     else
-        echo "SNR: ${snr} dB, Freq error: ${freq_error} Hz — below threshold"
-        return 1
+        # Single-channel: original behavior
+        local snr freq_error peak_freq
+        snr=$(echo "$RX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['snr_db'])" 2>/dev/null)
+        freq_error=$(echo "$RX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['freq_error_hz'])" 2>/dev/null)
+        peak_freq=$(echo "$RX_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['peak_freq_hz'])" 2>/dev/null)
+
+        if [[ "$status" == "PASS" ]]; then
+            echo "SNR: ${snr} dB, Freq error: ${freq_error} Hz, Peak: ${peak_freq} Hz"
+            return 0
+        else
+            echo "SNR: ${snr} dB, Freq error: ${freq_error} Hz — below threshold"
+            return 1
+        fi
     fi
 }
 
 # ── Execute ──────────────────────────────────────────────────────────────────
 
 log "====================================="
-log "SDR Validation Test"
+log "SDR Validation Test (channels: $NUM_CHANNELS)"
 log "====================================="
 
 run_step 1 "init_receiver"     "Initialize SDR receiver"  step_init_receiver

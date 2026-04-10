@@ -23,12 +23,13 @@ export function subscribeProgress(apiPath: string, id: string): EventSource {
   return new EventSource(`${API_BASE}/${apiPath}/${id}/progress`);
 }
 
-export async function startSdrTest(serialNumber: string, settings: Record<string, string>) {
+export async function startSdrTest(serialNumber: string, settings: Record<string, string>, dualChannel: boolean = true) {
   const res = await fetch(`${API_BASE}/sdr-test`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       serial_number: serialNumber,
+      dual_channel: dualChannel,
       settings: {
         device_ip: settings.deviceIp,
         ssh_username: settings.sshUsername,

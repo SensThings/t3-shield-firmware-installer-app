@@ -46,7 +46,7 @@ async def start_sdr_test(req: SdrTestRequest):
 
     def run():
         try:
-            run_sdr_test(serial, req.settings, emit)
+            run_sdr_test(serial, req.settings, emit, dual_channel=req.dual_channel)
         except Exception as e:
             logger.error("SDR test %s failed: %s", test_id, str(e))
             test = active_tests.get(test_id)

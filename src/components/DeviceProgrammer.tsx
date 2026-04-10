@@ -1,23 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings, StepStatus, InstallStep, INSTALL_STEPS, SDR_TEST_STEPS, StepUpdateEvent, PrepStepEvent, InstallResult } from '@/lib/types';
+import { Settings, InstallStep, INSTALL_STEPS, SDR_TEST_STEPS, StepUpdateEvent, PrepStepEvent, InstallResult, SdrMetrics, ChannelMetrics } from '@/lib/types';
 import { startInstall, startSdrTest, subscribeProgress } from '@/lib/api';
 import ProgressChecklist from './ProgressChecklist';
 
 type View = 'idle' | 'serial_input' | 'programming' | 'success' | 'failure';
 type ActionMode = 'install' | 'sdr_test';
-
-interface SdrMetrics {
-  status: string;
-  peak_freq_hz: number;
-  expected_freq_hz: number;
-  freq_error_hz: number;
-  snr_db: number;
-  snr_threshold_db: number;
-  peak_power_db: number;
-  noise_floor_db: number;
-}
 
 interface DeviceProgrammerProps {
   settings: Settings;
@@ -36,6 +25,7 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
   const [sdrMetrics, setSdrMetrics] = useState<SdrMetrics | null>(null);
   const [error, setError] = useState('');
   const [endTime, setEndTime] = useState(0);
+  const [dualChannel, setDualChannel] = useState(true);
   const serialInputRef = useRef<HTMLInputElement>(null);
 
   const missingCreds = !settings.ghcrUsername || !settings.ghcrToken;
@@ -109,7 +99,7 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
     try {
       const data = actionMode === 'install'
         ? await startInstall(serial, settings as unknown as Record<string, string>)
-        : await startSdrTest(serial, settings as unknown as Record<string, string>);
+        : await startSdrTest(serial, settings as unknown as Record<string, string>, dualChannel);
 
       if (!data.success) {
         setError(data.operator_message || data.error || DEFAULT_ERROR);
@@ -249,6 +239,19 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
             <span className="text-lg font-semibold text-zinc-200">Tester le SDR</span>
           </button>
         </div>
+        <div className="flex items-center gap-4 text-sm text-zinc-500">
+          <span>Mode test SDR :</span>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input type="radio" checked={!dualChannel} onChange={() => setDualChannel(false)}
+              className="accent-blue-500" />
+            <span className={!dualChannel ? 'text-zinc-200' : ''}>Canal unique</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input type="radio" checked={dualChannel} onChange={() => setDualChannel(true)}
+              className="accent-blue-500" />
+            <span className={dualChannel ? 'text-zinc-200' : ''}>Double canal</span>
+          </label>
+        </div>
       </div>
     );
   }
@@ -316,25 +319,32 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
             {mode === 'install' && result?.version && <p>Firmware : <span className="text-zinc-200">{result.version}</span></p>}
             {mode === 'install' && result?.image && <p>Image : <span className="text-zinc-200 font-mono text-xs">{result.image}</span></p>}
             {mode === 'sdr_test' && sdrMetrics && (
-              <div className="grid grid-cols-2 gap-3 mt-3">
-                <div className="bg-zinc-800 rounded-lg p-3 text-center">
-                  <div className="text-xs text-zinc-500">SNR</div>
-                  <div className="text-lg font-mono text-emerald-400">{sdrMetrics.snr_db} dB</div>
-                  <div className="text-xs text-zinc-600">seuil : {sdrMetrics.snr_threshold_db} dB</div>
+              sdrMetrics.channel_a && sdrMetrics.channel_b ? (
+                <div className="space-y-3 mt-3">
+                  <ChannelCard label="Canal A" metrics={sdrMetrics.channel_a} />
+                  <ChannelCard label="Canal B" metrics={sdrMetrics.channel_b} />
                 </div>
-                <div className="bg-zinc-800 rounded-lg p-3 text-center">
-                  <div className="text-xs text-zinc-500">Erreur fréq.</div>
-                  <div className="text-lg font-mono text-emerald-400">{sdrMetrics.freq_error_hz} Hz</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <div className="bg-zinc-800 rounded-lg p-3 text-center">
+                    <div className="text-xs text-zinc-500">SNR</div>
+                    <div className="text-lg font-mono text-emerald-400">{sdrMetrics.snr_db} dB</div>
+                    <div className="text-xs text-zinc-600">seuil : {sdrMetrics.snr_threshold_db} dB</div>
+                  </div>
+                  <div className="bg-zinc-800 rounded-lg p-3 text-center">
+                    <div className="text-xs text-zinc-500">Erreur fréq.</div>
+                    <div className="text-lg font-mono text-emerald-400">{sdrMetrics.freq_error_hz} Hz</div>
+                  </div>
+                  <div className="bg-zinc-800 rounded-lg p-3 text-center">
+                    <div className="text-xs text-zinc-500">Fréquence pic</div>
+                    <div className="text-lg font-mono text-zinc-200">{sdrMetrics.peak_freq_hz} Hz</div>
+                  </div>
+                  <div className="bg-zinc-800 rounded-lg p-3 text-center">
+                    <div className="text-xs text-zinc-500">Plancher de bruit</div>
+                    <div className="text-lg font-mono text-zinc-200">{sdrMetrics.noise_floor_db} dB</div>
+                  </div>
                 </div>
-                <div className="bg-zinc-800 rounded-lg p-3 text-center">
-                  <div className="text-xs text-zinc-500">Fréquence pic</div>
-                  <div className="text-lg font-mono text-zinc-200">{sdrMetrics.peak_freq_hz} Hz</div>
-                </div>
-                <div className="bg-zinc-800 rounded-lg p-3 text-center">
-                  <div className="text-xs text-zinc-500">Plancher de bruit</div>
-                  <div className="text-lg font-mono text-zinc-200">{sdrMetrics.noise_floor_db} dB</div>
-                </div>
-              </div>
+              )
             )}
           </div>
           {mode === 'install' ? (
@@ -386,4 +396,28 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
   }
 
   return null;
+}
+
+function ChannelCard({ label, metrics }: { label: string; metrics: ChannelMetrics }) {
+  const pass = metrics.status === 'PASS';
+  return (
+    <div className={`rounded-lg border p-3 ${pass ? 'border-emerald-800/50 bg-emerald-900/10' : 'border-red-800/50 bg-red-900/10'}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-zinc-300">{label}</span>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded ${pass ? 'bg-emerald-900/50 text-emerald-400' : 'bg-red-900/50 text-red-400'}`}>
+          {metrics.status}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="text-center">
+          <div className="text-xs text-zinc-500">SNR</div>
+          <div className={`text-sm font-mono ${pass ? 'text-emerald-400' : 'text-red-400'}`}>{metrics.snr_db} dB</div>
+        </div>
+        <div className="text-center">
+          <div className="text-xs text-zinc-500">Erreur fréq.</div>
+          <div className={`text-sm font-mono ${pass ? 'text-emerald-400' : 'text-red-400'}`}>{metrics.freq_error_hz} Hz</div>
+        </div>
+      </div>
+    </div>
+  );
 }

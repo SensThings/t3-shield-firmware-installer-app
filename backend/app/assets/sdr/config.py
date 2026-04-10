@@ -5,7 +5,13 @@ WARNING: Direct coax connection — keep TX_GAIN low or use a 30dB attenuator.
 
 CENTER_FREQ = 884e6
 SAMPLE_RATE = 1e6
-TONE_OFFSET = 100e3
+
+# Channel A tone offset (+100 kHz)
+TONE_OFFSET_A = 100e3
+# Channel B tone offset (+250 kHz) — 150 kHz separation for clean isolation
+TONE_OFFSET_B = 250e3
+# Backward compat alias for single-channel mode
+TONE_OFFSET = TONE_OFFSET_A
 
 TX_GAIN = 0
 RX_GAIN = 0

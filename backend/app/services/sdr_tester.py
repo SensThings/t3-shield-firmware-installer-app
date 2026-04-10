@@ -25,12 +25,14 @@ def _find_uhd_images_dir() -> str:
     return ""
 
 
-def run_sdr_test(serial_number: str, settings, emit: Callable):
+def run_sdr_test(serial_number: str, settings, emit: Callable, dual_channel: bool = True):
     """Run SDR validation test: TX on this desktop, RX on Pi."""
     conn = None
     tx_proc = None
+    num_channels = 2 if dual_channel else 1
 
-    logger.info("Starting SDR test for T3S-%s (device: %s)", serial_number, settings.device_ip)
+    logger.info("Starting SDR test for T3S-%s (device: %s, channels: %d)",
+                serial_number, settings.device_ip, num_channels)
 
     try:
         # === PREP: Check desktop SDR ===
@@ -78,28 +80,29 @@ def run_sdr_test(serial_number: str, settings, emit: Callable):
         tx_script = str(SDR_DIR / "tx_tone.py")
 
         tx_proc = subprocess.Popen(
-            ["python3", tx_script],
+            ["python3", tx_script, "--channels", str(num_channels)],
             cwd=str(SDR_DIR),
             env=env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        logger.info("TX started (PID: %d)", tx_proc.pid)
+        logger.info("TX started (PID: %d, channels: %d)", tx_proc.pid, num_channels)
 
-        # Wait for TX to initialize (UHD firmware load)
-        time.sleep(5)
+        # Wait for TX to initialize (UHD firmware load — longer for dual-channel)
+        time.sleep(8 if dual_channel else 5)
 
         if tx_proc.poll() is not None:
             logger.error("TX exited early (code: %s)", tx_proc.returncode)
             emit("prep_step", {"step_id": "start_transmitter", "status": "fail", "message": "Transmitter failed to start"})
             raise RuntimeError("TX process died during initialization")
 
-        emit("prep_step", {"step_id": "start_transmitter", "status": "pass", "message": "Transmitter active"})
+        ch_label = "double canal" if dual_channel else "canal unique"
+        emit("prep_step", {"step_id": "start_transmitter", "status": "pass", "message": f"Émetteur actif ({ch_label})"})
 
         # === RUN: Execute test.sh on Pi ===
         logger.info("Running test.sh on Pi")
 
-        command = f"bash /tmp/sdr/test.sh --duration {capture_duration} --json 2>&1"
+        command = f"bash /tmp/sdr/test.sh --duration {capture_duration} --channels {num_channels} --json 2>&1"
         processor = OutputProcessor()
 
         def on_output(data: str):
