@@ -119,7 +119,7 @@ export default function DeviceProgrammer({ settings, onDeviceProgrammed }: Devic
       }
 
       const progressId = data.install_id || data.test_id;
-      const progressPath = mode === 'install' ? 'install' : 'sdr-test';
+      const progressPath = actionMode === 'install' ? 'install' : 'sdr-test';
       const evtSource = subscribeProgress(progressPath, progressId);
 
       evtSource.onmessage = (event) => {

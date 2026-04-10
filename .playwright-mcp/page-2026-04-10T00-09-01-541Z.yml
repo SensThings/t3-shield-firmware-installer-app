@@ -1,0 +1,75 @@
+- generic [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - img [ref=e5]
+      - heading "T3-Shield — Installateur" [level=1] [ref=e7]
+      - generic [ref=e8]: v1.0.5
+      - generic [ref=e9]: "| op"
+    - generic [ref=e10]:
+      - generic "Appareil connecté" [ref=e34]:
+        - generic [ref=e13]: 192.168.137.100
+      - button "Paramètres" [active] [ref=e14]:
+        - img [ref=e15]
+      - button "Déconnexion" [ref=e18]:
+        - img [ref=e19]
+  - main [ref=e21]:
+    - generic [ref=e23]:
+      - heading "Vérifications avant démarrage" [level=2] [ref=e35]
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - generic [ref=e38]: SDR connecté à l'ordinateur
+          - generic [ref=e39]:
+            - button "Oui" [ref=e40]
+            - button "Non" [ref=e41]
+        - generic [ref=e42]:
+          - generic [ref=e43]: Câble Ethernet branché à l'ordinateur
+          - generic [ref=e44]:
+            - button "Oui" [ref=e45]
+            - button "Non" [ref=e46]
+        - generic [ref=e47]:
+          - generic [ref=e48]: Étiquette du numéro de série visible sur l'appareil
+          - generic [ref=e49]:
+            - button "Oui" [ref=e50]
+            - button "Non" [ref=e51]
+      - button "Démarrer la session" [disabled] [ref=e53]
+  - button "Open Next.js Dev Tools" [ref=e29] [cursor=pointer]:
+    - img [ref=e30]
+  - alert [ref=e33]
+  - generic [ref=e55]:
+    - generic [ref=e56]:
+      - heading "Paramètres" [level=2] [ref=e57]
+      - button [ref=e58]:
+        - img [ref=e59]
+    - generic [ref=e61]:
+      - heading "Appareil cible" [level=3] [ref=e62]
+      - generic [ref=e63]:
+        - generic [ref=e64]:
+          - generic [ref=e65]: Adresse IP
+          - textbox [ref=e66]: 192.168.137.100
+        - generic [ref=e67]:
+          - generic [ref=e68]: Utilisateur SSH
+          - textbox [ref=e69]: dragon
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - generic [ref=e72]: Mot de passe SSH
+            - textbox [ref=e73]: Sensthings@012
+          - button "Afficher" [ref=e74]
+        - button "Tester la connexion" [ref=e76]
+    - generic [ref=e77]:
+      - heading "Registre de conteneurs" [level=3] [ref=e78]
+      - generic [ref=e79]:
+        - generic [ref=e80]:
+          - generic [ref=e81]: Utilisateur GHCR
+          - textbox "Nom d'utilisateur GitHub" [ref=e82]: elmoadin
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - generic [ref=e85]: Jeton GHCR
+            - textbox "PAT GitHub avec read:packages" [ref=e86]: REPLACE_WITH_YOUR_GHCR_TOKEN
+          - button "Afficher" [ref=e87]
+        - generic [ref=e88]:
+          - generic [ref=e89]: Image firmware
+          - textbox [ref=e90]: ghcr.io/sensthings/t3shield-firmware:latest
+        - generic [ref=e91]:
+          - button "Tester GHCR" [ref=e92]
+          - button "Rafraîchir l'image" [ref=e93]
+    - button "Enregistrer" [ref=e95]

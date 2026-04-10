@@ -1,0 +1,19 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - img [ref=e5]
+      - heading "T3-Shield — Installateur" [level=1] [ref=e7]
+      - generic [ref=e8]: v1.0.5
+      - generic [ref=e9]: "| op"
+    - generic [ref=e10]:
+      - generic "Vérification..." [ref=e11]:
+        - generic [ref=e13]: 192.168.137.100
+      - button "Paramètres" [ref=e14]:
+        - img [ref=e15]
+      - button "Déconnexion" [ref=e18]:
+        - img [ref=e19]
+  - main [ref=e21]:
+    - generic [ref=e23]: Chargement de la checklist...
+  - button "Open Next.js Dev Tools" [ref=e29] [cursor=pointer]:
+    - img [ref=e30]
+  - alert [ref=e33]
