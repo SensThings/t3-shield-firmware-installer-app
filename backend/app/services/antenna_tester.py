@@ -118,7 +118,7 @@ def run_antenna_test(label: str, dual_channel: bool, emit: Callable):
         rx_err = open(rx_log, "w")
 
         rx_proc = subprocess.Popen(
-            ["python3", rx_script, "--channels", str(num_rx_channels), "--device", rx_serial],
+            ["python3", rx_script, "--channels", str(num_rx_channels), "--device", rx_serial, "--single-tone"],
             cwd=str(SDR_DIR),
             env=env,
             stdout=rx_out,

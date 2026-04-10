@@ -73,6 +73,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--channels", type=int, default=1, choices=[1, 2])
     parser.add_argument("--device", type=str, default="", help="UHD device serial (e.g. 000000544)")
+    parser.add_argument("--single-tone", action="store_true", help="Both channels look for same tone (TONE_OFFSET_A)")
     args = parser.parse_args()
 
     signal.signal(signal.SIGTERM, stop)
@@ -88,7 +89,10 @@ def main():
         usrp.set_rx_gain(RX_GAIN, ch)
 
     channel_labels = ["A", "B"][:num_channels]
-    offsets = [TONE_OFFSET_A, TONE_OFFSET_B][:num_channels]
+    if args.single_tone:
+        offsets = [TONE_OFFSET_A] * num_channels
+    else:
+        offsets = [TONE_OFFSET_A, TONE_OFFSET_B][:num_channels]
 
     print(f"[RX] Freq={CENTER_FREQ/1e6:.1f} MHz  Channels={num_channels}  "
           f"Gain={RX_GAIN}  Rate={SAMPLE_RATE/1e6:.1f} MS/s", file=sys.stderr)
