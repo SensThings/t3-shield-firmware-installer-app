@@ -15,6 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 JSON_MODE=false
 CAPTURE_DURATION=5
 NUM_CHANNELS=1
+CONFIG_FILE=""
 RESULT_FILE="/tmp/sdr-test-result.json"
 
 while [[ $# -gt 0 ]]; do
@@ -22,9 +23,15 @@ while [[ $# -gt 0 ]]; do
         --json)      JSON_MODE=true;        shift ;;
         --duration)  CAPTURE_DURATION="$2"; shift 2 ;;
         --channels)  NUM_CHANNELS="$2";     shift 2 ;;
+        --config)    CONFIG_FILE="$2";      shift 2 ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
+
+CONFIG_ARGS=""
+if [[ -n "$CONFIG_FILE" ]]; then
+    CONFIG_ARGS="--config $CONFIG_FILE"
+fi
 
 # ── Step runner (same format as install.sh) ──────────────────────────────────
 
@@ -138,7 +145,7 @@ step_run_test() {
     fi
 
     # Run RX with channel count
-    python3 rx_tone.py --channels "$NUM_CHANNELS" > "$json_out" 2>"$rx_log" &
+    python3 rx_tone.py --channels "$NUM_CHANNELS" $CONFIG_ARGS > "$json_out" 2>"$rx_log" &
     local rx_pid=$!
 
     # Wait for RX to start streaming (FPGA load can take 15-20s on Pi)

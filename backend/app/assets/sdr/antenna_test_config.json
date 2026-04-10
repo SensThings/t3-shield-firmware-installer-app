@@ -1,0 +1,15 @@
+{
+    "center_freq_hz": 884000000,
+    "sample_rate_hz": 1000000,
+    "tone_offset_a_hz": 100000,
+    "tone_offset_b_hz": 250000,
+    "tx_gain": 0,
+    "rx_gain": 0,
+    "capture_duration_s": 5.0,
+    "snr_threshold_db": 10.0,
+    "freq_tolerance_hz": 20000,
+    "search_bandwidth_hz": 40000,
+    "rx_analysis_samples": 65536,
+    "tx_init_wait_s": 5,
+    "rx_init_timeout_s": 60
+}

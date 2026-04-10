@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import install, sdr_test, antenna_test, settings, cache
+from .routers import install, sdr_test, antenna_test, sdr_config, settings, cache
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 
@@ -24,6 +24,7 @@ app.add_middleware(
 app.include_router(install.router)
 app.include_router(sdr_test.router)
 app.include_router(antenna_test.router)
+app.include_router(sdr_config.router)
 app.include_router(settings.router)
 app.include_router(cache.router)
 

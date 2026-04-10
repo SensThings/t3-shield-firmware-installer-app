@@ -69,6 +69,7 @@ def run_sdr_test(serial_number: str, settings, emit: Callable, dual_channel: boo
         conn.upload_file((SDR_DIR / "config.py").read_text(), "/tmp/sdr/config.py")
         conn.upload_file((SDR_DIR / "rx_tone.py").read_text(), "/tmp/sdr/rx_tone.py")
         conn.upload_file((SDR_DIR / "test.sh").read_text(), "/tmp/sdr/test.sh")
+        conn.upload_file((SDR_DIR / "sdr_test_config.json").read_text(), "/tmp/sdr/sdr_test_config.json")
         logger.info("Uploaded SDR test scripts to Pi")
 
         emit("prep_step", {"step_id": "upload_test_scripts", "status": "pass", "message": "Test scripts uploaded"})
@@ -76,11 +77,12 @@ def run_sdr_test(serial_number: str, settings, emit: Callable, dual_channel: boo
         # === PREP: Start TX locally ===
         emit("prep_step", {"step_id": "start_transmitter", "status": "in_progress", "message": "Starting transmitter..."})
 
+        config_file = str(SDR_DIR / "sdr_test_config.json")
         capture_duration = 5
         tx_script = str(SDR_DIR / "tx_tone.py")
 
         tx_proc = subprocess.Popen(
-            ["python3", tx_script, "--channels", str(num_channels)],
+            ["python3", tx_script, "--channels", str(num_channels), "--config", config_file],
             cwd=str(SDR_DIR),
             env=env,
             stdout=subprocess.DEVNULL,
@@ -102,7 +104,7 @@ def run_sdr_test(serial_number: str, settings, emit: Callable, dual_channel: boo
         # === RUN: Execute test.sh on Pi ===
         logger.info("Running test.sh on Pi")
 
-        command = f"bash /tmp/sdr/test.sh --duration {capture_duration} --channels {num_channels} --json 2>&1"
+        command = f"bash /tmp/sdr/test.sh --duration {capture_duration} --channels {num_channels} --config /tmp/sdr/sdr_test_config.json --json 2>&1"
         processor = OutputProcessor()
 
         def on_output(data: str):

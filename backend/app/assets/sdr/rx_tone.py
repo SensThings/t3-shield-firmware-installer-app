@@ -14,10 +14,10 @@ import numpy as np
 import uhd
 
 from config import (CENTER_FREQ, SAMPLE_RATE, TONE_OFFSET_A, TONE_OFFSET_B,
-                    RX_GAIN, TONE_SNR_MIN_DB, FREQ_TOLERANCE_HZ)
+                    RX_GAIN, TONE_SNR_MIN_DB, FREQ_TOLERANCE_HZ,
+                    SEARCH_BANDWIDTH_HZ, ANALYSIS_SAMPLES)
 
 RUNNING = True
-ANALYSIS_SAMPLES = 65536
 
 
 def stop(sig, frame):
@@ -35,7 +35,7 @@ def analyze(samples, expected_offset):
 
     # Search for peak near expected offset (within search_bw), not global peak
     # This avoids DC/carrier leakage dominating the result
-    search_bw = max(FREQ_TOLERANCE_HZ * 4, 20e3)  # search within ±20kHz or 4x tolerance
+    search_bw = max(FREQ_TOLERANCE_HZ * 4, SEARCH_BANDWIDTH_HZ)
     search_mask = (freqs >= expected_offset - search_bw) & (freqs <= expected_offset + search_bw)
 
     if np.any(search_mask):
@@ -97,6 +97,7 @@ def main():
     parser.add_argument("--channels", type=int, default=1, choices=[1, 2])
     parser.add_argument("--device", type=str, default="", help="UHD device serial (e.g. 000000544)")
     parser.add_argument("--single-tone", action="store_true", help="Both channels look for same tone (TONE_OFFSET_A)")
+    parser.add_argument("--config", type=str, default="", help="Path to JSON config file (parsed by config.py)")
     args = parser.parse_args()
 
     signal.signal(signal.SIGTERM, stop)

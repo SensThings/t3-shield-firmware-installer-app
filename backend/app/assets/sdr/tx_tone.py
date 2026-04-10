@@ -23,6 +23,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--channels", type=int, default=1, choices=[1, 2])
     parser.add_argument("--device", type=str, default="", help="UHD device serial (e.g. 000000544)")
+    parser.add_argument("--config", type=str, default="", help="Path to JSON config file (parsed by config.py)")
     args = parser.parse_args()
 
     signal.signal(signal.SIGTERM, stop)

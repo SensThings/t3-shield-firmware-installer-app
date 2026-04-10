@@ -97,6 +97,7 @@ export default function Home() {
       {showSettings && (
         <SettingsPanel
           settings={settings}
+          role={userRole}
           onSave={handleSaveSettings}
           onClose={() => setShowSettings(false)}
         />

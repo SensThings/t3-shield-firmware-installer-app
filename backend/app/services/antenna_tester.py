@@ -82,9 +82,10 @@ def run_antenna_test(label: str, dual_channel: bool, emit: Callable):
         # === PREP: Start TX (single channel, on SDR #1) ===
         emit("prep_step", {"step_id": "start_transmitter", "status": "in_progress", "message": "Démarrage émetteur..."})
 
+        config_file = str(SDR_DIR / "antenna_test_config.json")
         tx_script = str(SDR_DIR / "tx_tone.py")
         tx_proc = subprocess.Popen(
-            ["python3", tx_script, "--channels", "1", "--device", tx_serial],
+            ["python3", tx_script, "--channels", "1", "--device", tx_serial, "--config", config_file],
             cwd=str(SDR_DIR),
             env=env,
             stdout=subprocess.DEVNULL,
@@ -118,7 +119,7 @@ def run_antenna_test(label: str, dual_channel: bool, emit: Callable):
         rx_err = open(rx_log, "w")
 
         rx_proc = subprocess.Popen(
-            ["python3", rx_script, "--channels", str(num_rx_channels), "--device", rx_serial, "--single-tone"],
+            ["python3", rx_script, "--channels", str(num_rx_channels), "--device", rx_serial, "--single-tone", "--config", config_file],
             cwd=str(SDR_DIR),
             env=env,
             stdout=rx_out,
