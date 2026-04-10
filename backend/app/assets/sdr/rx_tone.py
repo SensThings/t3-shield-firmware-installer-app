@@ -33,16 +33,39 @@ def analyze(samples, expected_offset):
     magnitude = 20 * np.log10(np.abs(spectrum) + 1e-12)
     freqs = np.fft.fftshift(np.fft.fftfreq(N, 1.0 / SAMPLE_RATE))
 
-    peak_idx = np.argmax(magnitude)
+    # Search for peak near expected offset (within search_bw), not global peak
+    # This avoids DC/carrier leakage dominating the result
+    search_bw = max(FREQ_TOLERANCE_HZ * 4, 20e3)  # search within ±20kHz or 4x tolerance
+    search_mask = (freqs >= expected_offset - search_bw) & (freqs <= expected_offset + search_bw)
+
+    if np.any(search_mask):
+        search_indices = np.where(search_mask)[0]
+        local_peak = search_indices[np.argmax(magnitude[search_mask])]
+        peak_idx = local_peak
+    else:
+        # Fallback to global peak (excluding DC ±1kHz)
+        dc_mask = np.abs(freqs) > 1000
+        if np.any(dc_mask):
+            masked_mag = magnitude.copy()
+            masked_mag[~dc_mask] = -999
+            peak_idx = np.argmax(masked_mag)
+        else:
+            peak_idx = np.argmax(magnitude)
+
     peak_freq = freqs[peak_idx]
     peak_power = magnitude[peak_idx]
 
+    # Noise floor: exclude peak region and DC region
     noise_mask = np.ones(N, dtype=bool)
     guard = int(N * FREQ_TOLERANCE_HZ / SAMPLE_RATE) * 2
     lo = max(0, peak_idx - guard)
     hi = min(N, peak_idx + guard)
     noise_mask[lo:hi] = False
-    noise_floor = np.mean(magnitude[noise_mask])
+    # Also exclude DC region from noise calculation
+    dc_guard = int(N * 2000 / SAMPLE_RATE)  # ±2kHz around DC
+    dc_center = N // 2
+    noise_mask[max(0, dc_center - dc_guard):min(N, dc_center + dc_guard)] = False
+    noise_floor = np.mean(magnitude[noise_mask]) if np.any(noise_mask) else -40.0
 
     snr_db = peak_power - noise_floor
     freq_error = abs(peak_freq - expected_offset)
