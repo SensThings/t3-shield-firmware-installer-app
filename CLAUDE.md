@@ -51,6 +51,15 @@ Raspberry Pi (192.168.137.100)   → install.sh, Docker, firmware, SDR RX
 - **No technical values in UI** — no SNR, freq, dB shown to technicians. Only custom French messages.
 - **Config issues** shown in amber (not red) with "Paramètres" button
 
+## Authentication
+
+| Username | Password | Role | Access |
+|----------|----------|------|--------|
+| `op` | `123` | Operator | Programming + SDR test |
+| `antenna` | `123` | Antenna tester | Antenna test only |
+
+Settings are password-protected: `T3Shield2026!`
+
 ## Session Workflow
 
 Login → Pre-flight checklist → Serial input → Program (18 steps) → SDR Test (6 steps) → Next device
@@ -59,9 +68,17 @@ Antenna test desktop has a separate flow: Login → Antenna Test (5 steps) → N
 
 ## Data Directory
 
-All app data under `~/.t3s-installer/`: `cache/` (firmware, Docker binaries), `logs/` (operation logs per device), JSON configs (SDR/antenna test params).
+All app data under `~/.t3s-installer/`:
+
+- `cache/` — firmware tar, Docker binaries (populated on first install, reused after)
+- `logs/` — operation logs per device (install, sdr-test, antenna-test)
+- `settings.json` — device connection settings (SSH, GHCR, firmware image)
+- `sdr_test_config.json` — SDR test parameters
+- `antenna_test_config.json` — antenna test parameters
 
 Operation logs are written for every operation (pass or fail) and never deleted — used for remote diagnosis.
+
+Hostname is set to the raw serial number (no prefix).
 
 ---
 

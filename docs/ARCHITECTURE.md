@@ -85,8 +85,9 @@ Runs natively on the desktop (systemd service, not Docker in production).
 | `app/services/ssh_service.py` | Paramiko SSH wrapper: exec, stream, upload |
 | `app/services/offline_assets.py` | Docker binary + firmware image cache management |
 | `app/utils/progress_parser.py` | Parse install.sh/test.sh output → structured step events |
-| `app/utils/error_handler.py` | French error messages loader |
-| `app/utils/error_messages.json` | All operator-facing error messages (French) |
+| `app/utils/error_handler.py` | French error messages + binary test diagnosis (`diagnose_test_result()`) |
+| `app/utils/error_messages.json` | All operator-facing error messages (French, ~60 entries) |
+| `app/utils/operation_logger.py` | Write detailed JSON logs per operation to `~/.t3s-installer/logs/` |
 | `app/utils/checklist.json` | Pre-flight checklist items (French) |
 
 ### Assets (scripts that run on the Pi)
@@ -95,8 +96,10 @@ Runs natively on the desktop (systemd service, not Docker in production).
 |------|---------|
 | `app/assets/install.sh` | 13-step firmware installation script |
 | `app/assets/sdr/test.sh` | 3-step SDR validation test script |
-| `app/assets/sdr/config.py` | Shared SDR config (frequency, gain, thresholds) |
-| `app/assets/sdr/rx_tone.py` | RF receiver + FFT analysis (runs on Pi) |
+| `app/assets/sdr/config.py` | SDR config loader — reads from JSON via `--config` flag |
+| `app/assets/sdr/sdr_test_config.json` | Default SDR test parameters (shipped with app) |
+| `app/assets/sdr/antenna_test_config.json` | Default antenna test parameters (relaxed thresholds) |
+| `app/assets/sdr/rx_tone.py` | RF receiver + FFT analysis (runs on Pi or desktop) |
 | `app/assets/sdr/tx_tone.py` | RF transmitter (runs on desktop) |
 
 ---
@@ -111,12 +114,21 @@ Runs natively on the desktop (systemd service, not Docker in production).
 | `GET /install/{id}/progress` | SSE stream | Events until completion |
 | `POST /sdr-test` | Start SDR test | Returns `{success, test_id}` |
 | `GET /sdr-test/{id}/progress` | SSE stream | Events until completion |
+| `POST /antenna-test` | Start antenna test | Returns `{success, test_id}` |
+| `GET /antenna-test/{id}/progress` | SSE stream | Events until completion |
 | `POST /settings/test` | Test SSH | Returns `{success, message, latency_ms}` |
 | `POST /settings/test-ghcr` | Test GHCR | Returns `{success, message}` |
 | `GET /checklist` | Get checklist | Returns `[{id, label}]` |
 | `POST /auth/login` | Login | Returns `{success}` or `{success: false, error}` |
 | `GET /cache` | Cache status | Returns `{docker_binaries, firmware_image, firmware_tag}` |
 | `DELETE /cache` | Clear cache | Removes firmware tar/digest/version |
+| `GET /config/sdr-test` | Read SDR config | Returns JSON config |
+| `PUT /config/sdr-test` | Update SDR config | Merges and saves |
+| `GET /config/antenna-test` | Read antenna config | Returns JSON config |
+| `PUT /config/antenna-test` | Update antenna config | Merges and saves |
+| `GET /config/settings` | Read device settings | Returns SSH/GHCR/firmware settings |
+| `PUT /config/settings` | Update device settings | Merges and saves to `~/.t3s-installer/settings.json` |
+| `GET /health` | Health check | Returns `{status, version}` |
 
 ### Backend → Frontend (SSE Events)
 

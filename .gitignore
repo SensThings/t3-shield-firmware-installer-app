@@ -39,6 +39,9 @@ token.txt
 # claude
 .claude/
 
+# dev scripts (local only)
+/scripts/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

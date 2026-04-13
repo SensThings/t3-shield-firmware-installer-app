@@ -352,6 +352,43 @@ docker logs -f t3s-frontend
 5. Wait for the 6 test steps
 6. PASS = SDR receiver is working correctly
 
+### Antenna Test
+
+1. Connect **two** B210 SDRs to the desktop via USB
+2. Login with `antenna` / `123` (antenna role)
+3. Click **Tester les antennes**
+4. Optionally enter a label (e.g., antenna batch number)
+5. Wait for the 5 test steps (TX on SDR #1, RX on SDR #2, over the air)
+6. PASS = antennas are receiving correctly
+
+### Accessing Settings
+
+Settings are password-protected. Click the gear icon and enter `T3Shield2026!`.
+
+Settings include:
+- **Device connection:** Pi IP, SSH credentials
+- **Container registry:** GHCR username, token, firmware image
+- **SDR test parameters:** frequency, gain, thresholds (collapsible)
+- **Antenna test parameters:** separate thresholds for over-the-air testing (collapsible)
+
+Settings are saved to both browser localStorage and backend file (`~/.t3s-installer/settings.json`). Use **Rafraîchir** to reload settings from the backend.
+
+### Login Roles
+
+| Username | Password | Access |
+|----------|----------|--------|
+| `op` | `123` | Programming + SDR test |
+| `antenna` | `123` | Antenna test only |
+
+### Operation Logs
+
+Every operation (install, SDR test, antenna test) writes a detailed JSON log to `~/.t3s-installer/logs/<operation>/`. These logs contain full technical details (config, metrics, diagnosis) and are used for remote troubleshooting. They are never deleted.
+
+```bash
+# View latest SDR test log
+cat ~/.t3s-installer/logs/sdr-test/$(ls -t ~/.t3s-installer/logs/sdr-test/ | head -1) | python3 -m json.tool
+```
+
 ---
 
 ## Troubleshooting

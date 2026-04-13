@@ -12,6 +12,7 @@ Systematic steps to diagnose unexplained errors. Work through each layer from bo
 | Frontend (container) | `docker logs -f t3s-frontend` |
 | Backend (service) | `sudo journalctl -u t3s-backend -f` |
 | Backend (last 100 lines) | `sudo journalctl -u t3s-backend -n 100 --no-pager` |
+| Operation logs | `ls -lt ~/.t3s-installer/logs/{install,sdr-test,antenna-test}/` |
 | Pi SSH session | `ssh dragon@192.168.137.100` then inspect manually |
 | Pi firmware container | `ssh dragon@192.168.137.100 "sudo docker logs t3shield-firmware"` |
 | Pi system log | `ssh dragon@192.168.137.100 "journalctl -n 50 --no-pager"` |
@@ -387,6 +388,44 @@ If login fails: token expired. Generate a new one at https://github.com/settings
 
 ---
 
+## Layer 8: Antenna Test Issues
+
+The antenna test runs entirely on the desktop (no SSH to Pi). It needs **two** B210 SDRs connected via USB.
+
+### 8.1 Check both SDRs are detected
+
+```bash
+uhd_find_devices
+```
+
+Must show two devices with different serials. If only one: check USB cables.
+
+### 8.2 Check antenna test logs
+
+```bash
+# Latest antenna test result
+cat ~/.t3s-installer/logs/antenna-test/$(ls -t ~/.t3s-installer/logs/antenna-test/ | head -1) | python3 -m json.tool
+```
+
+The log contains full metrics (SNR, frequency, power) and diagnosis (which threshold failed).
+
+### 8.3 Common antenna test failures
+
+| Diagnosis | Meaning | Fix |
+|-----------|---------|-----|
+| `snr_pass_freq_fail` | Signal strong but frequency off | Increase `freq_tolerance_hz` in Settings > Antenna test |
+| `snr_fail_freq_pass` | Frequency correct but weak signal | Check antenna connections, orientation |
+| `snr_fail_freq_fail` | No valid signal | Check all connections, verify TX SDR is working |
+
+### 8.4 Check TX/RX stderr
+
+```bash
+cat /tmp/t3s-antenna-tx-stderr.log
+cat /tmp/antenna-rx-stderr.log
+```
+
+---
+
 ## Debugging Flowchart
 
 When you get an unexplained error, follow this order:
@@ -412,7 +451,7 @@ When you get an unexplained error, follow this order:
    ↓ Pi looks healthy?
 
 5. Re-run the script manually on Pi
-   sudo bash /tmp/install.sh --image-tar /tmp/firmware.tar --hostname T3S-DEBUG --json 2>&1
+   sudo bash /tmp/install.sh --image-tar /tmp/firmware.tar --hostname DEBUG001 --json 2>&1
    ↓ which step fails?
 
 6. Check browser console (F12)
