@@ -16,7 +16,17 @@ class SSHConnection:
         """Execute command, return (stdout, stderr, exit_code)."""
         _, stdout, stderr = self.client.exec_command(cmd, timeout=timeout)
         exit_code = stdout.channel.recv_exit_status()
-        return stdout.read().decode(), stderr.read().decode(), exit_code
+        try:
+            out = stdout.read().decode()
+        except UnicodeDecodeError:
+            out = stdout.read().decode("utf-8", errors="replace")
+            logger.warning("SSH stdout decode error (replaced invalid bytes)")
+        try:
+            err = stderr.read().decode()
+        except UnicodeDecodeError:
+            err = stderr.read().decode("utf-8", errors="replace")
+            logger.warning("SSH stderr decode error (replaced invalid bytes)")
+        return out, err, exit_code
 
     def exec_stream(self, cmd: str, on_output: Callable[[str], None], timeout: int = 900) -> int:
         """Execute command with streaming output."""
@@ -26,21 +36,33 @@ class SSHConnection:
         channel = stdout.channel
         while not channel.exit_status_ready() or channel.recv_ready() or channel.recv_stderr_ready():
             if channel.recv_ready():
-                data = channel.recv(4096).decode()
+                try:
+                    data = channel.recv(4096).decode()
+                except UnicodeDecodeError:
+                    data = channel.recv(4096).decode("utf-8", errors="replace")
                 if data:
                     on_output(data)
             if channel.recv_stderr_ready():
-                data = channel.recv_stderr(4096).decode()
+                try:
+                    data = channel.recv_stderr(4096).decode()
+                except UnicodeDecodeError:
+                    data = channel.recv_stderr(4096).decode("utf-8", errors="replace")
                 if data:
                     on_output(data)
 
         # Drain remaining
         while channel.recv_ready():
-            data = channel.recv(4096).decode()
+            try:
+                data = channel.recv(4096).decode()
+            except UnicodeDecodeError:
+                data = channel.recv(4096).decode("utf-8", errors="replace")
             if data:
                 on_output(data)
         while channel.recv_stderr_ready():
-            data = channel.recv_stderr(4096).decode()
+            try:
+                data = channel.recv_stderr(4096).decode()
+            except UnicodeDecodeError:
+                data = channel.recv_stderr(4096).decode("utf-8", errors="replace")
             if data:
                 on_output(data)
 

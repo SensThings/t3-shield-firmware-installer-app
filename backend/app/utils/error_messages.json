@@ -38,53 +38,95 @@
     },
     "sdr_verify": {
       "fail": "Le récepteur de signal n'est pas prêt. Débranchez le câble USB du SDR de l'appareil, rebranchez-le, puis réessayez."
+    },
+    "tar_create": {
+      "fail": "Impossible de créer l'archive Docker. Vérifiez l'espace disque du poste."
+    },
+    "upload_docker_tar": {
+      "fail": "Impossible d'envoyer l'archive Docker à l'appareil. Vérifiez la connexion Ethernet."
+    },
+    "upload_firmware_tar": {
+      "fail": "Impossible d'envoyer le firmware à l'appareil. Vérifiez la connexion Ethernet."
+    },
+    "no_json_result": {
+      "fail": "Le script d'installation n'a renvoyé aucun résultat. Débranchez l'appareil, attendez 10 secondes, rebranchez, puis réessayez."
     }
   },
   "sdr_test": {
     "init_receiver": {
-      "fail": "Le récepteur de signal de l'appareil n'a pas été détecté. Vérifiez le câble USB du SDR sur l'appareil."
+      "fail": "Le récepteur de signal de l'appareil n'a pas été détecté. Vérifiez le câble USB du SDR sur l'appareil.",
+      "uhd_not_found": "Les outils UHD ne sont pas installés sur ce poste. Contactez le responsable pour installer UHD.",
+      "no_b210": "Aucun SDR B210 détecté sur ce poste. Vérifiez que le SDR est bien connecté en USB.",
+      "timeout": "La détection du SDR a pris trop de temps. Débranchez et rebranchez le câble USB du SDR, puis réessayez."
     },
     "run_test": {
-      "fail": "La capture du signal a échoué. Vérifiez que le câble coaxial est bien connecté au bon port (RX2) et réessayez."
+      "fail": "La capture du signal a échoué. Vérifiez que le câble coaxial est bien connecté au bon port (RX2) et réessayez.",
+      "upload_failed": "Impossible d'envoyer les scripts de test à l'appareil. Vérifiez la connexion Ethernet.",
+      "streaming_timeout": "Le récepteur de l'appareil n'a pas pu démarrer la capture (timeout). Débranchez le câble USB du SDR de l'appareil, rebranchez-le, puis réessayez.",
+      "no_json": "Aucun résultat reçu du récepteur. Débranchez le câble USB du SDR de l'appareil, rebranchez-le, puis réessayez.",
+      "tx_died": "L'émetteur s'est arrêté de manière inattendue. Vérifiez la connexion USB du SDR du poste."
     },
     "validate_results": {
       "fail": "Le test de validation a échoué. Vérifiez les connexions du câble coaxial et réessayez.",
       "fail_channel_a": "Le canal A du SDR a échoué. Vérifiez le câble SMA du port RX2-A de l'appareil.",
       "fail_channel_b": "Le canal B du SDR a échoué. Vérifiez le câble SMA du port RX2-B de l'appareil.",
       "fail_both_channels": "Les deux canaux SDR ont échoué. Vérifiez les connexions coaxiales et les antennes.",
-      "no_signal": "Aucun signal détecté. Vérifiez : 1) Le câble coaxial est bien branché des deux côtés. 2) Le bon port est utilisé (RX2 sur l'appareil). 3) Le SDR du poste est connecté en USB.",
-      "low_snr": "Signal trop faible. Vérifiez les connexions du câble coaxial — elles sont peut-être desserrées.",
-      "freq_error": "Signal détecté à la mauvaise fréquence. Débranchez et rebranchez le câble coaxial, puis réessayez."
+      "snr_pass_freq_fail": "Signal détecté avec bonne puissance, mais la fréquence est décalée. Augmentez freq_tolerance_hz dans Paramètres > Test SDR.",
+      "snr_fail_freq_pass": "Fréquence correcte, mais signal trop faible. Vérifiez les connexions du câble coaxial — elles sont peut-être desserrées.",
+      "snr_fail_freq_fail": "Aucun signal valide détecté. Vérifiez : 1) Le câble coaxial est bien branché des deux côtés. 2) Le bon port est utilisé (RX2). 3) Le SDR du poste est connecté en USB.",
+      "snr_pass_freq_fail_both": "Les deux canaux ont une bonne puissance mais une fréquence décalée. Augmentez freq_tolerance_hz dans Paramètres > Test SDR.",
+      "snr_fail_freq_pass_both": "Les deux canaux ont la bonne fréquence mais un signal trop faible. Vérifiez les connexions des câbles coaxiaux.",
+      "snr_fail_freq_fail_both": "Aucun signal valide sur les deux canaux. Vérifiez le câble coaxial et les connexions USB du SDR."
     }
   },
   "antenna_test": {
     "check_desktop_sdrs": {
-      "fail": "Deux SDR B210 sont nécessaires. Vérifiez que les deux sont connectés en USB."
+      "fail": "Deux SDR B210 sont nécessaires. Vérifiez que les deux sont connectés en USB.",
+      "uhd_not_found": "Les outils UHD ne sont pas installés sur ce poste. Contactez le responsable pour installer UHD.",
+      "not_enough_sdrs": "Moins de deux SDR B210 détectés. Vérifiez que les deux SDR sont connectés en USB.",
+      "timeout": "La détection des SDR a pris trop de temps. Débranchez et rebranchez les câbles USB des SDR, puis réessayez."
     },
     "start_transmitter": {
-      "fail": "L'émetteur n'a pas pu démarrer. Vérifiez la connexion USB du SDR émetteur."
+      "fail": "L'émetteur n'a pas pu démarrer. Vérifiez la connexion USB du SDR émetteur.",
+      "tx_died": "L'émetteur s'est arrêté de manière inattendue. Vérifiez la connexion USB du SDR émetteur."
     },
     "start_receiver": {
-      "fail": "Le récepteur n'a pas pu démarrer. Vérifiez la connexion USB du SDR récepteur."
+      "fail": "Le récepteur n'a pas pu démarrer. Vérifiez la connexion USB du SDR récepteur.",
+      "timeout": "Le récepteur n'a pas pu démarrer la capture (timeout 60s). Débranchez et rebranchez le câble USB du SDR récepteur.",
+      "died": "Le processus récepteur s'est arrêté de manière inattendue. Vérifiez la connexion USB du SDR récepteur."
     },
     "validate_results": {
       "fail": "Le test d'antenne a échoué. Vérifiez les connexions des antennes.",
       "fail_channel_a": "L'antenne du canal A a échoué. Vérifiez la connexion sur le port RX2-A.",
       "fail_channel_b": "L'antenne du canal B a échoué. Vérifiez la connexion sur le port RX2-B.",
-      "fail_both": "Les deux antennes ont échoué. Vérifiez les connexions et le câble coaxial de l'émetteur."
+      "fail_both": "Les deux antennes ont échoué. Vérifiez les connexions et le câble coaxial de l'émetteur.",
+      "no_json": "Aucun résultat reçu du récepteur. Vérifiez les connexions USB des SDR et réessayez.",
+      "snr_pass_freq_fail": "Signal détecté avec bonne puissance, mais la fréquence est décalée. Augmentez freq_tolerance_hz dans Paramètres > Test antenne.",
+      "snr_fail_freq_pass": "Fréquence correcte, mais signal trop faible. Vérifiez que les antennes sont bien vissées et orientées.",
+      "snr_fail_freq_fail": "Aucun signal valide détecté. Vérifiez : 1) Les antennes sont bien connectées. 2) L'émetteur est connecté au bon SDR. 3) Les antennes ne sont pas endommagées.",
+      "snr_pass_freq_fail_both": "Les deux antennes ont une bonne puissance mais une fréquence décalée. Augmentez freq_tolerance_hz dans Paramètres > Test antenne.",
+      "snr_fail_freq_pass_both": "Les deux antennes ont la bonne fréquence mais un signal trop faible. Vérifiez les connexions des antennes.",
+      "snr_fail_freq_fail_both": "Aucun signal valide sur les deux antennes. Vérifiez toutes les connexions d'antenne et le câble coaxial de l'émetteur."
     }
   },
   "connection": {
     "unreachable": "Impossible d'atteindre l'appareil. Vérifiez : 1) Le câble Ethernet est branché. 2) L'appareil est allumé. 3) Le voyant vert du port Ethernet clignote.",
     "auth_failed": "Connexion refusée. Les identifiants de l'appareil ont peut-être changé — vérifiez les Paramètres.",
-    "timeout": "Délai de connexion dépassé. Débranchez le câble Ethernet, attendez 5 secondes, rebranchez, puis réessayez."
+    "timeout": "Délai de connexion dépassé. Débranchez le câble Ethernet, attendez 5 secondes, rebranchez, puis réessayez.",
+    "decode_error": "Erreur de communication avec l'appareil (données corrompues). Débranchez et rebranchez le câble Ethernet.",
+    "upload_failed": "Impossible d'envoyer le fichier à l'appareil. Vérifiez la connexion Ethernet."
   },
   "preparation": {
     "prepare_docker": {
-      "fail": "Impossible de préparer les binaires Docker. Vérifiez la connexion internet du poste."
+      "fail": "Impossible de préparer les binaires Docker. Vérifiez la connexion internet du poste.",
+      "timeout": "Le téléchargement des binaires Docker a pris trop de temps. Vérifiez la connexion internet."
     },
     "prepare_firmware": {
-      "fail": "Impossible de préparer le firmware. Vérifiez la connexion internet et les identifiants GHCR dans Paramètres."
+      "fail": "Impossible de préparer le firmware. Vérifiez la connexion internet et les identifiants GHCR dans Paramètres.",
+      "ghcr_login_failed": "Connexion au registre GHCR échouée. Vérifiez les identifiants dans Paramètres.",
+      "pull_failed": "Impossible de télécharger l'image firmware. Vérifiez le nom de l'image dans Paramètres.",
+      "save_failed": "Impossible de sauvegarder l'image firmware. Vérifiez l'espace disque du poste.",
+      "write_failed": "Impossible d'écrire les fichiers de version. Vérifiez les permissions du dossier cache."
     },
     "upload_script": {
       "fail": "Impossible d'envoyer le script d'installation. Vérifiez la connexion Ethernet avec l'appareil."
@@ -104,5 +146,9 @@
     "start_transmitter": {
       "fail": "L'émetteur n'a pas pu démarrer. Vérifiez la connexion USB du SDR du poste."
     }
+  },
+  "config": {
+    "parse_error": "Le fichier de configuration est invalide (JSON malformé). Les valeurs par défaut seront utilisées. Vérifiez le fichier dans Paramètres.",
+    "write_error": "Impossible de sauvegarder la configuration. Vérifiez les permissions du dossier."
   }
 }

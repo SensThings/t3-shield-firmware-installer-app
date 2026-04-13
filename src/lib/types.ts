@@ -81,17 +81,21 @@ export const ANTENNA_TEST_STEPS: { id: string; label: string; source: 'prep' | '
 
 export interface InstallResult {
   operation: string;
-  image: string;
-  version: string | null;
+  image?: string;
+  version?: string | null;
   started_at: string;
   finished_at: string;
   result: 'pass' | 'fail';
+  diagnosis?: TestDiagnosis;
+  operator_message?: string;
+  metrics?: SdrMetrics;
   steps: {
     id: number;
     name: string;
     label: string;
     status: 'pass' | 'fail' | 'skipped';
     message: string | null;
+    operator_message?: string;
     duration_s: number | null;
   }[];
 }
@@ -152,6 +156,20 @@ export interface SdrMetrics {
   // Dual-channel fields
   channel_a?: ChannelMetrics;
   channel_b?: ChannelMetrics;
+}
+
+export interface ChannelDiagnosis {
+  snr_pass: boolean;
+  freq_pass: boolean;
+  failure_type: string;
+  is_config_issue: boolean;
+}
+
+export interface TestDiagnosis {
+  failure_type: string;
+  is_config_issue: boolean;
+  operator_message: string;
+  channels: Record<string, ChannelDiagnosis>;
 }
 
 export interface TestConnectionResult {

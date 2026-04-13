@@ -92,6 +92,7 @@ export default function Home() {
           paused={sessionPaused}
           onSessionTimer={handleSessionTimer}
           onDeviceCount={handleDeviceCount}
+          onOpenSettings={() => setShowSettings(true)}
         />
       </main>
       {showSettings && (

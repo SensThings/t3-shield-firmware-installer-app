@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, HTTPException
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -36,13 +36,21 @@ def _config_path(name: str) -> Path:
 def _read_config(name: str) -> dict:
     try:
         return json.loads(_config_path(name).read_text())
-    except (FileNotFoundError, json.JSONDecodeError):
+    except FileNotFoundError:
+        logger.warning("Config file not found for %s, returning empty", name)
+        return {}
+    except json.JSONDecodeError as e:
+        logger.error("Malformed JSON in %s config: %s", name, e)
         return {}
 
 
 def _write_config(name: str, data: dict):
     path = _config_path(name)
-    path.write_text(json.dumps(data, indent=4) + "\n")
+    try:
+        path.write_text(json.dumps(data, indent=4) + "\n")
+    except OSError as e:
+        logger.error("Failed to write config %s: %s", path, e)
+        raise HTTPException(status_code=500, detail=f"Cannot write config: {e}")
 
 
 @router.get("/config/sdr-test")

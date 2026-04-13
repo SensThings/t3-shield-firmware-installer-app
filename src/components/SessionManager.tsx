@@ -15,9 +15,10 @@ interface SessionManagerProps {
   paused: boolean;
   onSessionTimer: (seconds: number) => void;
   onDeviceCount: (count: number) => void;
+  onOpenSettings?: () => void;
 }
 
-export default function SessionManager({ settings, operatorName, role = 'op', paused, onSessionTimer, onDeviceCount }: SessionManagerProps) {
+export default function SessionManager({ settings, operatorName, role = 'op', paused, onSessionTimer, onDeviceCount, onOpenSettings }: SessionManagerProps) {
   const [phase, setPhase] = useState<SessionPhase>('checklist');
   const [deviceCount, setDeviceCount] = useState(0);
   const sessionStartRef = useRef(0);
@@ -74,6 +75,7 @@ export default function SessionManager({ settings, operatorName, role = 'op', pa
       settings={settings}
       role={role}
       onDeviceProgrammed={incrementDeviceCount}
+      onOpenSettings={onOpenSettings}
     />
   );
 }
