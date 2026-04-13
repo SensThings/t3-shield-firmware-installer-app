@@ -48,10 +48,20 @@ Raspberry Pi (192.168.137.100)   → install.sh, Docker, firmware, SDR RX
 - **Desktop only** — no mobile responsiveness needed
 - **All UI text in French** — code and git messages stay in English
 - **Status colors:** green=pass, red=fail, yellow=in-progress, grey=pending
+- **No technical values in UI** — no SNR, freq, dB shown to technicians. Only custom French messages.
+- **Config issues** shown in amber (not red) with "Paramètres" button
 
 ## Session Workflow
 
 Login → Pre-flight checklist → Serial input → Program (18 steps) → SDR Test (6 steps) → Next device
+
+Antenna test desktop has a separate flow: Login → Antenna Test (5 steps) → Next antenna
+
+## Data Directory
+
+All app data under `~/.t3s-installer/`: `cache/` (firmware, Docker binaries), `logs/` (operation logs per device), JSON configs (SDR/antenna test params).
+
+Operation logs are written for every operation (pass or fail) and never deleted — used for remote diagnosis.
 
 ---
 

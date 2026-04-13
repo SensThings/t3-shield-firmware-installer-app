@@ -471,5 +471,5 @@ Settings are stored in localStorage. If the browser clears its data (update, pri
 | `/opt/t3s-installer/backend/` | Backend source code |
 | `/opt/t3s-installer/t3s-update.sh` | Update script (contains GHCR token) |
 | `/opt/t3s-installer/VERSION` | Current installed version |
-| `~/.t3shield-installer/` | Firmware cache (Docker binaries, firmware tar) |
+| `~/.t3s-installer/` | All app data: `cache/` (firmware, Docker), configs (JSON), `logs/` (operation logs) |
 | Browser localStorage | SSH settings, GHCR credentials, auth state |

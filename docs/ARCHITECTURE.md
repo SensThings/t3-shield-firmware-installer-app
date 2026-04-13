@@ -160,7 +160,7 @@ The frontend shows one continuous checklist. Behind the scenes, steps 1-5 are "p
 
 | # | ID | Label | What happens |
 |---|-----|-------|-------------|
-| 6 | `set_hostname` | Définir le nom de l'appareil | `hostnamectl set-hostname T3S-<serial>` |
+| 6 | `set_hostname` | Définir le nom de l'appareil | `hostnamectl set-hostname <serial>` (raw serial, no prefix) |
 | 7 | `expand_partition` | Étendre la partition SD | `parted` + `resize2fs` on root partition |
 | 8 | `configure_network` | Configurer le réseau | Set default route + DNS (online mode only) |
 | 9 | `docker_install` | Installer Docker | Extract static binaries, create systemd services |
@@ -236,19 +236,29 @@ Terminer la session (or Pause/Reprendre)
 
 ---
 
-## Offline Asset Cache
+## Data Directory
 
-Location: `~/.t3shield-installer/` on the desktop.
+All app data lives under `~/.t3s-installer/` on the desktop:
 
-| File | Size | Purpose |
-|------|------|---------|
-| `docker-static.tgz` | ~60 MB | Docker CE 27.5.1 static binaries (aarch64) |
-| `docker-static/` | extracted | Ready-to-upload binaries |
-| `firmware.tar` | 400 MB - 1 GB | Docker image saved as tar |
-| `firmware-version.txt` | text | Image URI (for display) |
-| `firmware-digest.txt` | text | Manifest digest (for smart cache invalidation) |
+```
+~/.t3s-installer/
+  cache/                        # Offline asset cache
+    docker-static.tgz           # Docker CE 27.5.1 static binaries (aarch64, ~60 MB)
+    docker-static/              # Extracted binaries (ready to upload)
+    firmware.tar                # Docker image saved as tar (400 MB - 1 GB)
+    firmware-version.txt        # Image URI (for display)
+    firmware-digest.txt         # Manifest digest (for smart cache invalidation)
+  logs/                         # Operation logs (one JSON per operation, never deleted)
+    install/                    # Install logs: 2026-04-13_21-50-31_00000001.json
+    sdr-test/                   # SDR test logs
+    antenna-test/               # Antenna test logs
+  sdr_test_config.json          # User-editable SDR test parameters
+  antenna_test_config.json      # User-editable antenna test parameters
+```
 
-Cache is populated on first install. Subsequent installs skip download. Use "Rafraichir l'image" in Settings or `DELETE /cache` to force re-download.
+Cache is populated on first install. Subsequent installs skip download. Use "Rafraîchir l'image" in Settings or `DELETE /cache` to force re-download.
+
+Large file uploads use SCP (2x faster than SFTP) with automatic SFTP fallback.
 
 ---
 
@@ -267,6 +277,43 @@ The update script (`t3s-update.sh`) checks current vs latest by listing remote g
 
 ---
 
+## Antenna Test Flow
+
+Desktop-only test (no SSH to Pi). Two B210 SDRs connected to the desktop: one transmits, one receives through the antennas over the air.
+
+### Steps
+
+| # | ID | Label | What happens |
+|---|-----|-------|-------------|
+| 1 | `check_desktop_sdrs` | Vérifier les SDR du poste | Run `uhd_find_devices`, require 2 B210 serials |
+| 2 | `start_transmitter` | Démarrer l'émetteur | `tx_tone.py` on SDR #1 (single channel, 884 MHz + 100 kHz tone) |
+| 3 | `start_receiver` | Démarrer le récepteur | `rx_tone.py` on SDR #2 (single-tone mode, 1 or 2 channels) |
+| 4 | `capture` | Capturer le signal RF | Wait for capture duration (configurable, default 5s) |
+| 5 | `validate_results` | Valider les résultats | Binary pass/fail per channel based on SNR threshold + freq tolerance |
+
+### Config
+
+Antenna test uses separate thresholds (relaxed for over-the-air): `antenna_test_config.json` with SNR threshold 10 dB, freq tolerance 20 kHz.
+
+---
+
+## Config Endpoints
+
+SDR and antenna test parameters are configurable via JSON files and REST API:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/config/sdr-test` | GET | Read SDR test config |
+| `/config/sdr-test` | PUT | Update SDR test config |
+| `/config/antenna-test` | GET | Read antenna test config |
+| `/config/antenna-test` | PUT | Update antenna test config |
+
+Parameters include: `center_freq_hz`, `sample_rate_hz`, `tone_offset_a_hz`, `tx_gain`, `rx_gain`, `capture_duration_s`, `snr_threshold_db`, `freq_tolerance_hz`, `search_bandwidth_hz`.
+
+Default configs ship in `app/assets/sdr/`. User edits are saved to `~/.t3s-installer/` and take precedence.
+
+---
+
 ## Error Handling
 
 All errors surfaced to the operator are in **French**, loaded from `error_messages.json`.
@@ -275,8 +322,14 @@ All errors surfaced to the operator are in **French**, loaded from `error_messag
 |-------|----------------|
 | SSH connection fails | `ssh_service` → `error_handler.get_connection_message()` → SSE `install_error` event with `operator_message` |
 | Install step fails | `install.sh` output → `progress_parser` → step marked `fail` → `error_handler.get_operator_message()` enriches message |
+| SDR/antenna test fails | `diagnose_test_result()` → binary diagnosis (4 cases per channel) → specific French message from `error_messages.json` |
+| Config issue detected | SNR passes but freq tolerance too tight → amber UI banner with "Paramètres" button |
 | Frontend network error | Caught in `DeviceProgrammer.tsx` → French fallback: "Une erreur est survenue. Réessayez ou signalez au responsable." |
 | Prep step fails | `installer.py`/`sdr_tester.py` → `error_handler.get_prep_message()` → SSE `prep_step` with `fail` status |
+
+### Operation Logs
+
+Every operation (install, SDR test, antenna test) writes a detailed JSON log to `~/.t3s-installer/logs/<operation>/`. Logs contain the full config snapshot, raw metrics, diagnosis, step results, and errors. They are never deleted and are used for remote diagnosis.
 
 ---
 

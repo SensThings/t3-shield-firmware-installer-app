@@ -334,7 +334,7 @@ Shows: `docker_binaries` (bool), `firmware_image` (bool), `firmware_tag` (string
 ### 7.2 Inspect cache files
 
 ```bash
-ls -lh ~/.t3shield-installer/
+ls -lh ~/.t3s-installer/cache/
 ```
 
 Expected:
@@ -346,14 +346,26 @@ firmware-version.txt        image URI
 firmware-digest.txt         manifest digest
 ```
 
-### 7.3 Clear and rebuild cache
+### 7.3 Inspect operation logs
+
+```bash
+# List recent logs
+ls -lt ~/.t3s-installer/logs/install/ | head
+ls -lt ~/.t3s-installer/logs/sdr-test/ | head
+ls -lt ~/.t3s-installer/logs/antenna-test/ | head
+
+# View latest log (full config, metrics, diagnosis)
+cat ~/.t3s-installer/logs/sdr-test/$(ls -t ~/.t3s-installer/logs/sdr-test/ | head -1) | python3 -m json.tool
+```
+
+### 7.4 Clear and rebuild cache
 
 ```bash
 # Via API
 curl -s -X DELETE http://localhost:8000/cache
 
 # Or manually
-rm -rf ~/.t3shield-installer/firmware*
+rm -rf ~/.t3s-installer/cache/firmware*
 ```
 
 Next install will re-download the firmware image.
@@ -429,7 +441,8 @@ echo "=== Network ===" && ip addr show | grep 192.168.137
 echo "=== Ping Pi ===" && ping -c 2 192.168.137.100 2>&1
 echo "=== Cache ===" && curl -s http://localhost:8000/cache 2>&1
 echo "=== Health ===" && curl -s http://localhost:8000/health 2>&1
-echo "=== Disk ===" && df -h / ~/.t3shield-installer/ 2>&1
+echo "=== Disk ===" && df -h / ~/.t3s-installer/ 2>&1
+echo "=== Latest operation logs ===" && ls -lt ~/.t3s-installer/logs/install/ 2>/dev/null | head -3 && ls -lt ~/.t3s-installer/logs/sdr-test/ 2>/dev/null | head -3
 echo "=== Docker ===" && docker info 2>&1 | head -5
 ```
 

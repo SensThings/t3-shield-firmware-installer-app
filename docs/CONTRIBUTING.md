@@ -161,10 +161,16 @@ Browser → api.ts → FastAPI routers → services → SSH → Pi
 2. Messages are loaded at runtime — no rebuild needed for backend
 3. The frontend displays `operator_message` from SSE events, falling back to a generic French message
 
-### Change SDR test parameters
+### Change SDR/antenna test parameters
 
-1. Edit `backend/app/assets/sdr/config.py` (frequency, gain, thresholds)
-2. Both `tx_tone.py` and `rx_tone.py` import from `config.py`
+Parameters are in JSON config files, editable via Settings UI or API:
+
+- Default configs: `backend/app/assets/sdr/sdr_test_config.json` and `antenna_test_config.json`
+- User overrides: saved to `~/.t3s-installer/` (take precedence over defaults)
+- API: `GET/PUT /config/sdr-test` and `GET/PUT /config/antenna-test`
+- `config.py` reads from JSON at runtime via `--config` flag (no more hardcoded values)
+
+Key parameters: `snr_threshold_db`, `freq_tolerance_hz`, `search_bandwidth_hz`, `tx_gain`, `rx_gain`
 
 ---
 
