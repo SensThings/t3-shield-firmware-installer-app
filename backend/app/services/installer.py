@@ -21,7 +21,7 @@ def _get_install_script() -> str:
 
 def run_install(serial_number: str, settings, emit: Callable):
     """Run the full offline installation flow."""
-    hostname = f"T3S-{serial_number}"
+    hostname = serial_number
     paths = offline_assets.get_cache_paths()
     conn = None
 

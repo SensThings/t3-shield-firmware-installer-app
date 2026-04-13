@@ -316,7 +316,7 @@ export default function DeviceProgrammer({ settings, role = 'op', onDeviceProgra
               placeholder={isAntennaTest ? 'ex. LOT-A-001' : 'ex. 12345'}
               className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-200 text-lg placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" />
             {!isAntennaTest && serialNumber.trim() && (
-              <p className="text-sm text-zinc-500 mt-2">Nom de l&apos;appareil : <span className="text-zinc-300 font-mono">T3S-{serialNumber.trim()}</span></p>
+              <p className="text-sm text-zinc-500 mt-2">Nom de l&apos;appareil : <span className="text-zinc-300 font-mono">{serialNumber.trim()}</span></p>
             )}
             {!isAntennaTest && serialNumber.trim() && !isValid && (
               <p className="text-sm text-red-400 mt-1">Doit être alphanumérique, au moins 3 caractères.</p>
@@ -361,7 +361,7 @@ export default function DeviceProgrammer({ settings, role = 'op', onDeviceProgra
             {mode === 'install' ? 'Appareil programmé avec succès !' : mode === 'antenna_test' ? 'Test antenne réussi !' : 'Test SDR réussi !'}
           </h2>
           <div className="space-y-2 text-sm text-zinc-400 mb-6">
-            {mode !== 'antenna_test' && <p>Appareil : <span className="text-zinc-200 font-mono">T3S-{serialNumber.trim()}</span></p>}
+            {mode !== 'antenna_test' && <p>Appareil : <span className="text-zinc-200 font-mono">{serialNumber.trim()}</span></p>}
             {mode === 'antenna_test' && serialNumber.trim() && <p>Étiquette : <span className="text-zinc-200 font-mono">{serialNumber.trim()}</span></p>}
             <p>Durée : <span className="text-zinc-200 font-mono">{elapsedStr}</span></p>
             {mode === 'install' && result?.version && <p>Firmware : <span className="text-zinc-200">{result.version}</span></p>}

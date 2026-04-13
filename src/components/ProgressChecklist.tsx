@@ -26,7 +26,7 @@ export default function ProgressChecklist({ steps, serialNumber, startTime, mode
     <div className="w-full max-w-xl">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-zinc-100">
-          {mode === 'install' ? 'Programmation' : mode === 'antenna_test' ? 'Test antenne' : 'Test SDR'}{serialNumber ? ` : ${mode === 'antenna_test' ? serialNumber : `T3S-${serialNumber}`}` : ''}
+          {mode === 'install' ? 'Programmation' : mode === 'antenna_test' ? 'Test antenne' : 'Test SDR'}{serialNumber ? ` : ${serialNumber}` : ''}
         </h2>
         <span className="text-sm text-zinc-400 font-mono">
           {elapsed.toFixed(1)}s

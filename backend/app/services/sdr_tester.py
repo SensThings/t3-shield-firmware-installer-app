@@ -91,7 +91,7 @@ def run_sdr_test(serial_number: str, settings, emit: Callable, dual_channel: boo
     config_path = _resolve_config_path("sdr")
     config = _load_config(config_path)
 
-    logger.info("Starting SDR test for T3S-%s (device: %s, channels: %d)",
+    logger.info("Starting SDR test for %s (device: %s, channels: %d)",
                 serial_number, settings.device_ip, num_channels)
     _log_config(config, config_path, "SDR test")
 
