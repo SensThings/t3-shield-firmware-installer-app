@@ -83,6 +83,20 @@ export async function clearCache() {
   return res.json();
 }
 
+export async function getDeviceSettings() {
+  const res = await fetch(`${API_BASE}/config/settings`);
+  return res.json();
+}
+
+export async function updateDeviceSettings(config: Record<string, string>) {
+  const res = await fetch(`${API_BASE}/config/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  return res.json();
+}
+
 export async function getSdrTestConfig() {
   const res = await fetch(`${API_BASE}/config/sdr-test`);
   return res.json();
