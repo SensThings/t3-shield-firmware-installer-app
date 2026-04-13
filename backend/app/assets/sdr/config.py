@@ -40,8 +40,17 @@ if _config_path and os.path.isfile(_config_path):
         with open(_config_path) as f:
             loaded = json.load(f)
             _config.update(loaded)
-    except (json.JSONDecodeError, IOError):
-        pass
+        print(f"[CONFIG] Loaded from {_config_path}: snr_threshold={_config.get('snr_threshold_db')}, "
+              f"freq_tolerance={_config.get('freq_tolerance_hz')}, "
+              f"search_bw={_config.get('search_bandwidth_hz')}", file=sys.stderr)
+    except json.JSONDecodeError as e:
+        print(f"[CONFIG] WARNING: Failed to parse {_config_path}: {e} — using defaults", file=sys.stderr)
+    except IOError as e:
+        print(f"[CONFIG] WARNING: Cannot read {_config_path}: {e} — using defaults", file=sys.stderr)
+elif _config_path:
+    print(f"[CONFIG] WARNING: Config file not found: {_config_path} — using defaults", file=sys.stderr)
+else:
+    print("[CONFIG] No config file specified — using defaults", file=sys.stderr)
 
 # Export as module-level constants (used by tx_tone.py and rx_tone.py)
 CENTER_FREQ = float(_config["center_freq_hz"])

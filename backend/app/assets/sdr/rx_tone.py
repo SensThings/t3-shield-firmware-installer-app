@@ -105,12 +105,25 @@ def main():
 
     num_channels = args.channels
     dev_args = f"serial={args.device}" if args.device else ""
-    usrp = uhd.usrp.MultiUSRP(dev_args)
-    usrp.set_rx_rate(SAMPLE_RATE)
 
-    for ch in range(num_channels):
-        usrp.set_rx_freq(uhd.libpyuhd.types.tune_request(CENTER_FREQ), ch)
-        usrp.set_rx_gain(RX_GAIN, ch)
+    try:
+        usrp = uhd.usrp.MultiUSRP(dev_args)
+    except Exception as e:
+        print(f"[RX] FATAL: Failed to open USRP device ({dev_args}): {e}", file=sys.stderr)
+        error_result = {"status": "FAIL", "error": f"USRP device error: {e}"}
+        print(json.dumps(error_result))
+        sys.exit(1)
+
+    try:
+        usrp.set_rx_rate(SAMPLE_RATE)
+        for ch in range(num_channels):
+            usrp.set_rx_freq(uhd.libpyuhd.types.tune_request(CENTER_FREQ), ch)
+            usrp.set_rx_gain(RX_GAIN, ch)
+    except Exception as e:
+        print(f"[RX] FATAL: Failed to configure USRP: {e}", file=sys.stderr)
+        error_result = {"status": "FAIL", "error": f"USRP config error: {e}"}
+        print(json.dumps(error_result))
+        sys.exit(1)
 
     channel_labels = ["A", "B"][:num_channels]
     if args.single_tone:

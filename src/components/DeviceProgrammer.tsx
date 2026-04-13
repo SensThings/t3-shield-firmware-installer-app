@@ -13,11 +13,12 @@ interface DeviceProgrammerProps {
   settings: Settings;
   role?: UserRole;
   onDeviceProgrammed?: () => void;
+  onOpenSettings?: () => void;
 }
 
 const DEFAULT_ERROR = 'Une erreur est survenue. Réessayez ou signalez au responsable.';
 
-export default function DeviceProgrammer({ settings, role = 'op', onDeviceProgrammed }: DeviceProgrammerProps) {
+export default function DeviceProgrammer({ settings, role = 'op', onDeviceProgrammed, onOpenSettings }: DeviceProgrammerProps) {
   const [view, setView] = useState<View>('idle');
   const [mode, setMode] = useState<ActionMode>('install');
   const [serialNumber, setSerialNumber] = useState('');
@@ -130,6 +131,12 @@ export default function DeviceProgrammer({ settings, role = 'op', onDeviceProgra
             const r = parsed.data;
             setResult(r);
             if (r.metrics) setSdrMetrics(r.metrics);
+            // Use diagnosis operator_message as the error message if available
+            if (r.diagnosis?.operator_message) {
+              setError(r.diagnosis.operator_message);
+            } else if (r.operator_message) {
+              setError(r.operator_message);
+            }
             setEndTime(Date.now());
             setView(r.result === 'pass' ? 'success' : 'failure');
             evtSource.close();
@@ -418,11 +425,23 @@ export default function DeviceProgrammer({ settings, role = 'op', onDeviceProgra
               Échoué à : <span className="text-red-400">{failedStep.label}</span>
             </p>
           )}
-          <p className="text-sm text-red-400/80 mb-6">
-            {error || failedStep?.message || DEFAULT_ERROR}
-          </p>
+          {result?.diagnosis?.is_config_issue ? (
+            <div className="bg-amber-900/20 border border-amber-700/50 rounded-lg p-3 mb-4">
+              <p className="text-sm text-amber-300 mb-1 font-medium">Problème de configuration</p>
+              <p className="text-sm text-amber-400/80">
+                {error || failedStep?.message || DEFAULT_ERROR}
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-red-400/80 mb-4">
+              {error || failedStep?.message || DEFAULT_ERROR}
+            </p>
+          )}
           <div className="flex justify-center gap-3">
             <button onClick={retry} className="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-lg font-medium transition-colors">Réessayer</button>
+            {result?.diagnosis?.is_config_issue && (
+              <button onClick={() => onOpenSettings?.()} className="px-5 py-2 bg-amber-700 hover:bg-amber-600 text-white rounded-lg font-medium transition-colors">Paramètres</button>
+            )}
             <button onClick={reset} className="px-5 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-lg font-medium transition-colors">Autre appareil</button>
           </div>
         </div>
