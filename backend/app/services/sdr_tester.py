@@ -12,6 +12,7 @@ from ..utils.progress_parser import OutputProcessor
 from ..utils.error_handler import (
     get_operator_message, get_connection_message, diagnose_test_result,
 )
+from ..utils.operation_logger import write_operation_log
 
 logger = logging.getLogger(__name__)
 
@@ -236,6 +237,11 @@ def run_sdr_test(serial_number: str, settings, emit: Callable, dual_channel: boo
                         step["operator_message"] = get_operator_message("sdr_test", step.get("name", ""), "fail")
 
             _log_test_summary(serial_number, test_result, test_result.get("diagnosis"), config_path)
+            write_operation_log(
+                operation="sdr-test", serial=serial_number, result=test_result.get("result", "fail"),
+                config=config, metrics=test_result.get("metrics"),
+                diagnosis=test_result.get("diagnosis"), steps=test_result.get("steps"),
+            )
             emit("test_complete", test_result)
             return test_result
 
@@ -246,6 +252,10 @@ def run_sdr_test(serial_number: str, settings, emit: Callable, dual_channel: boo
             "steps": [],
             "operator_message": get_operator_message("sdr_test", "run_test", "no_json"),
         }
+        write_operation_log(
+            operation="sdr-test", serial=serial_number, result="fail",
+            config=config, error="No JSON result from test.sh",
+        )
         emit("test_complete", fail_result)
         return fail_result
 
@@ -266,6 +276,10 @@ def run_sdr_test(serial_number: str, settings, emit: Callable, dual_channel: boo
             operator_msg = get_operator_message("sdr_test", "run_test", "tx_died")
         else:
             operator_msg = get_operator_message("sdr_test", "run_test", "fail")
+        write_operation_log(
+            operation="sdr-test", serial=serial_number, result="fail",
+            config=config, error=msg,
+        )
         emit("test_error", {"error": msg, "operator_message": operator_msg})
         raise
     finally:
