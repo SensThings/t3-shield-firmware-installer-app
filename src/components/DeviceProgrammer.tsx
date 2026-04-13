@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Settings, InstallStep, INSTALL_STEPS, SDR_TEST_STEPS, ANTENNA_TEST_STEPS, StepUpdateEvent, PrepStepEvent, InstallResult, SdrMetrics, ChannelMetrics } from '@/lib/types';
+import { Settings, InstallStep, INSTALL_STEPS, SDR_TEST_STEPS, ANTENNA_TEST_STEPS, StepUpdateEvent, PrepStepEvent, InstallResult, SdrMetrics } from '@/lib/types';
 import { startInstall, startSdrTest, startAntennaTest, subscribeProgress } from '@/lib/api';
 import { UserRole } from '@/lib/auth';
 import ProgressChecklist from './ProgressChecklist';
@@ -59,16 +59,20 @@ export default function DeviceProgrammer({ settings, role = 'op', onDeviceProgra
   };
 
   const handlePrepStep = useCallback((update: PrepStepEvent) => {
-    setSteps(prev => prev.map(s =>
-      s.source === 'prep' && s.id === update.step_id
-        ? {
-            ...s,
-            status: update.status,
-            message: update.operator_message || update.message,
-            startedAt: update.status === 'in_progress' ? Date.now() : s.startedAt,
-          }
-        : s
-    ));
+    setSteps(prev => prev.map(s => {
+      if (s.source !== 'prep' || s.id !== update.step_id) return s;
+      const isStarting = update.status === 'in_progress';
+      const isComplete = update.status === 'pass' || update.status === 'fail';
+      return {
+        ...s,
+        status: update.status,
+        message: update.operator_message || update.message,
+        // Only set startedAt on first in_progress (don't reset on progress updates)
+        startedAt: isStarting && !s.startedAt ? Date.now() : s.startedAt,
+        // Calculate duration when step completes
+        duration: isComplete && s.startedAt ? (Date.now() - s.startedAt) / 1000 : s.duration,
+      };
+    }));
   }, []);
 
   const handleStepUpdate = useCallback((update: StepUpdateEvent) => {
@@ -76,12 +80,14 @@ export default function DeviceProgrammer({ settings, role = 'op', onDeviceProgra
       const next = [...prev];
       const idx = next.findIndex(s => s.source === 'install' && s.backendNumber === update.step_number);
       if (idx >= 0) {
+        const isStarting = update.status === 'in_progress';
+        const isComplete = update.status === 'pass' || update.status === 'fail';
         next[idx] = {
           ...next[idx],
           status: update.status,
           message: update.operator_message || update.message || next[idx].message,
-          duration: update.duration,
-          startedAt: update.status === 'in_progress' ? Date.now() : next[idx].startedAt,
+          duration: update.duration ?? (isComplete && next[idx].startedAt ? (Date.now() - next[idx].startedAt) / 1000 : next[idx].duration),
+          startedAt: isStarting && !next[idx].startedAt ? Date.now() : next[idx].startedAt,
         };
         if (update.status === 'fail') {
           for (let i = idx + 1; i < next.length; i++) {
@@ -360,33 +366,23 @@ export default function DeviceProgrammer({ settings, role = 'op', onDeviceProgra
             <p>Durée : <span className="text-zinc-200 font-mono">{elapsedStr}</span></p>
             {mode === 'install' && result?.version && <p>Firmware : <span className="text-zinc-200">{result.version}</span></p>}
             {mode === 'install' && result?.image && <p>Image : <span className="text-zinc-200 font-mono text-xs">{result.image}</span></p>}
-            {mode === 'sdr_test' && sdrMetrics && (
-              sdrMetrics.channel_a && sdrMetrics.channel_b ? (
-                <div className="space-y-3 mt-3">
-                  <ChannelCard label="Canal A" metrics={sdrMetrics.channel_a} />
-                  <ChannelCard label="Canal B" metrics={sdrMetrics.channel_b} />
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div className="bg-zinc-800 rounded-lg p-3 text-center">
-                    <div className="text-xs text-zinc-500">SNR</div>
-                    <div className="text-lg font-mono text-emerald-400">{sdrMetrics.snr_db} dB</div>
-                    <div className="text-xs text-zinc-600">seuil : {sdrMetrics.snr_threshold_db} dB</div>
+            {(mode === 'sdr_test' || mode === 'antenna_test') && sdrMetrics && (
+              <div className="mt-3">
+                {sdrMetrics.channel_a && sdrMetrics.channel_b ? (
+                  <div className="flex gap-4 justify-center">
+                    <div className={`px-4 py-2 rounded-lg ${sdrMetrics.channel_a.status === 'PASS' ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>
+                      Canal A : {sdrMetrics.channel_a.status === 'PASS' ? 'OK' : 'Échoué'}
+                    </div>
+                    <div className={`px-4 py-2 rounded-lg ${sdrMetrics.channel_b.status === 'PASS' ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>
+                      Canal B : {sdrMetrics.channel_b.status === 'PASS' ? 'OK' : 'Échoué'}
+                    </div>
                   </div>
-                  <div className="bg-zinc-800 rounded-lg p-3 text-center">
-                    <div className="text-xs text-zinc-500">Erreur fréq.</div>
-                    <div className="text-lg font-mono text-emerald-400">{sdrMetrics.freq_error_hz} Hz</div>
+                ) : (
+                  <div className="px-4 py-2 rounded-lg bg-emerald-900/30 text-emerald-400 inline-block">
+                    Signal validé
                   </div>
-                  <div className="bg-zinc-800 rounded-lg p-3 text-center">
-                    <div className="text-xs text-zinc-500">Fréquence pic</div>
-                    <div className="text-lg font-mono text-zinc-200">{sdrMetrics.peak_freq_hz} Hz</div>
-                  </div>
-                  <div className="bg-zinc-800 rounded-lg p-3 text-center">
-                    <div className="text-xs text-zinc-500">Plancher de bruit</div>
-                    <div className="text-lg font-mono text-zinc-200">{sdrMetrics.noise_floor_db} dB</div>
-                  </div>
-                </div>
-              )
+                )}
+              </div>
             )}
           </div>
           {mode === 'install' ? (
@@ -452,26 +448,3 @@ export default function DeviceProgrammer({ settings, role = 'op', onDeviceProgra
   return null;
 }
 
-function ChannelCard({ label, metrics }: { label: string; metrics: ChannelMetrics }) {
-  const pass = metrics.status === 'PASS';
-  return (
-    <div className={`rounded-lg border p-3 ${pass ? 'border-emerald-800/50 bg-emerald-900/10' : 'border-red-800/50 bg-red-900/10'}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-zinc-300">{label}</span>
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded ${pass ? 'bg-emerald-900/50 text-emerald-400' : 'bg-red-900/50 text-red-400'}`}>
-          {metrics.status}
-        </span>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="text-center">
-          <div className="text-xs text-zinc-500">SNR</div>
-          <div className={`text-sm font-mono ${pass ? 'text-emerald-400' : 'text-red-400'}`}>{metrics.snr_db} dB</div>
-        </div>
-        <div className="text-center">
-          <div className="text-xs text-zinc-500">Erreur fréq.</div>
-          <div className={`text-sm font-mono ${pass ? 'text-emerald-400' : 'text-red-400'}`}>{metrics.freq_error_hz} Hz</div>
-        </div>
-      </div>
-    </div>
-  );
-}

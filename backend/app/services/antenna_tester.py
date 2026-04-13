@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..utils.error_handler import get_operator_message, diagnose_test_result
+from ..utils.operation_logger import write_operation_log
 
 logger = logging.getLogger(__name__)
 
@@ -281,28 +282,22 @@ def run_antenna_test(label: str, dual_channel: bool, emit: Callable):
 
         overall_status = rx_result.get("status", "FAIL")
 
-        # Diagnose the result
+        # Diagnose the result — no technical values in UI messages
         diagnosis = None
         if overall_status == "PASS":
             if dual_channel:
                 ch_a = rx_result.get("channel_a", {})
                 ch_b = rx_result.get("channel_b", {})
-                msg = f"A: {ch_a.get('status')} (SNR {ch_a.get('snr_db')} dB) | B: {ch_b.get('status')} (SNR {ch_b.get('snr_db')} dB)"
+                msg = f"Canal A: {'OK' if ch_a.get('status') == 'PASS' else 'Échoué'} | Canal B: {'OK' if ch_b.get('status') == 'PASS' else 'Échoué'}"
             else:
-                msg = f"SNR: {rx_result.get('snr_db')} dB"
+                msg = "Signal validé"
             emit("step_update", {"step_number": 3, "status": "pass", "message": msg, "duration": 0.1})
         else:
             diagnosis = diagnose_test_result(rx_result, "antenna_test")
             logger.warning("Antenna test FAILED: %s", diagnosis.get("failure_type"))
 
-            if dual_channel:
-                ch_a = rx_result.get("channel_a", {})
-                ch_b = rx_result.get("channel_b", {})
-                msg = f"A: {ch_a.get('status')} (SNR {ch_a.get('snr_db', '?')} dB, err {ch_a.get('freq_error_hz', '?')} Hz) | B: {ch_b.get('status')} (SNR {ch_b.get('snr_db', '?')} dB, err {ch_b.get('freq_error_hz', '?')} Hz)"
-            else:
-                msg = f"SNR: {rx_result.get('snr_db')} dB, freq_err: {rx_result.get('freq_error_hz')} Hz"
             emit("step_update", {"step_number": 3, "status": "fail",
-                                 "message": msg, "duration": 0.1,
+                                 "message": diagnosis["operator_message"], "duration": 0.1,
                                  "operator_message": diagnosis["operator_message"]})
 
         # Build final result
@@ -319,6 +314,10 @@ def run_antenna_test(label: str, dual_channel: bool, emit: Callable):
             result["diagnosis"] = diagnosis
 
         _log_test_summary(label, rx_result, diagnosis, config_path)
+        write_operation_log(
+            operation="antenna-test", serial=label or "unnamed", result=result["result"],
+            config=config, metrics=rx_result, diagnosis=diagnosis,
+        )
         emit("test_complete", result)
         return result
 
@@ -337,6 +336,10 @@ def run_antenna_test(label: str, dual_channel: bool, emit: Callable):
             operator_msg = get_operator_message("antenna_test", "start_receiver", "fail")
         else:
             operator_msg = get_operator_message("antenna_test", "validate_results", "fail")
+        write_operation_log(
+            operation="antenna-test", serial=label or "unnamed", result="fail",
+            config=config, error=msg,
+        )
         emit("test_error", {"error": msg, "operator_message": operator_msg})
         raise
     finally:

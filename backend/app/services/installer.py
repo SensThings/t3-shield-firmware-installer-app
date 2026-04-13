@@ -8,6 +8,7 @@ from typing import Callable
 from ..services import ssh_service, offline_assets
 from ..utils.progress_parser import OutputProcessor
 from ..utils.error_handler import get_operator_message, get_connection_message, get_prep_message
+from ..utils.operation_logger import write_operation_log
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,11 @@ def run_install(serial_number: str, settings, emit: Callable):
                 for step in result.get("steps", []):
                     if step.get("status") == "fail":
                         step["operator_message"] = get_operator_message("install", step.get("name", ""), "fail")
+            write_operation_log(
+                operation="install", serial=serial_number, result=result.get("result", "fail"),
+                steps=result.get("steps"),
+                extra={"image": settings.firmware_image, "version": result.get("version")},
+            )
             emit("install_complete", result)
             return result
 
@@ -117,12 +123,21 @@ def run_install(serial_number: str, settings, emit: Callable):
             "result": "fail",
             "steps": [],
         }
+        write_operation_log(
+            operation="install", serial=serial_number, result="fail",
+            error="No JSON result from install.sh",
+            extra={"image": settings.firmware_image},
+        )
         emit("install_complete", fail_result)
         return fail_result
 
     except Exception as e:
         msg = str(e)
         logger.error("Install failed: %s", msg)
+        write_operation_log(
+            operation="install", serial=serial_number, result="fail", error=msg,
+            extra={"image": settings.firmware_image},
+        )
         if "timed out" in msg.lower() or "refused" in msg.lower():
             operator_msg = get_connection_message("unreachable")
         elif "authentication" in msg.lower():
