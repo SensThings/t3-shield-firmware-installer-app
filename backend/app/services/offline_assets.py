@@ -6,11 +6,36 @@ import subprocess
 logger = logging.getLogger(__name__)
 
 DOCKER_STATIC_URL = "https://download.docker.com/linux/static/stable/aarch64/docker-27.5.1.tgz"
-CACHE_DIR = os.path.join(os.path.expanduser("~"), ".t3shield-installer")
+CACHE_DIR = os.path.join(os.path.expanduser("~"), ".t3s-installer", "cache")
+_OLD_CACHE_DIR = os.path.join(os.path.expanduser("~"), ".t3shield-installer")
 
 
 def ensure_cache_dir():
     os.makedirs(CACHE_DIR, exist_ok=True)
+    _migrate_old_cache()
+
+
+def _migrate_old_cache():
+    """Move files from old ~/.t3shield-installer/ to new ~/.t3s-installer/cache/."""
+    if not os.path.isdir(_OLD_CACHE_DIR):
+        return
+    migrated = 0
+    for name in os.listdir(_OLD_CACHE_DIR):
+        old_path = os.path.join(_OLD_CACHE_DIR, name)
+        new_path = os.path.join(CACHE_DIR, name)
+        if os.path.isfile(old_path) and not os.path.exists(new_path):
+            shutil.move(old_path, new_path)
+            migrated += 1
+        elif os.path.isdir(old_path) and not os.path.exists(new_path):
+            shutil.move(old_path, new_path)
+            migrated += 1
+    if migrated:
+        logger.info("Migrated %d items from %s to %s", migrated, _OLD_CACHE_DIR, CACHE_DIR)
+    # Remove old dir if empty
+    try:
+        os.rmdir(_OLD_CACHE_DIR)
+    except OSError:
+        pass
 
 
 def get_cache_paths() -> dict:

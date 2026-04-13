@@ -1,5 +1,7 @@
 import logging
 import os
+import subprocess
+import tempfile
 import time
 from typing import Callable, Optional
 
@@ -9,8 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 class SSHConnection:
-    def __init__(self, client: paramiko.SSHClient):
+    def __init__(self, client: paramiko.SSHClient, host: str = "", username: str = "", password: str = ""):
         self.client = client
+        self._host = host
+        self._username = username
+        self._password = password
 
     def exec_command(self, cmd: str, timeout: int = 60) -> tuple[str, str, int]:
         """Execute command, return (stdout, stderr, exit_code)."""
@@ -83,8 +88,67 @@ class SSHConnection:
         remote_path: str,
         on_progress: Optional[Callable[[int], None]] = None,
     ):
-        """Upload a large binary file via SFTP with progress."""
+        """Upload a large binary file. Uses SCP (2x faster) with SFTP fallback."""
         file_size = os.path.getsize(local_path)
+        size_mb = file_size // (1024 * 1024)
+
+        # Try SCP first (2x faster than Paramiko SFTP on Gigabit Ethernet)
+        if self._host and self._password:
+            try:
+                return self._upload_scp(local_path, remote_path, file_size, on_progress)
+            except Exception as e:
+                logger.warning("SCP failed, falling back to SFTP: %s", e)
+
+        # Fallback: Paramiko SFTP
+        self._upload_sftp(local_path, remote_path, on_progress)
+
+    def _upload_scp(
+        self,
+        local_path: str,
+        remote_path: str,
+        file_size: int,
+        on_progress: Optional[Callable[[int], None]] = None,
+    ):
+        """Upload via SCP subprocess (faster than Paramiko SFTP)."""
+        # Create askpass script for non-interactive password
+        askpass_fd, askpass_path = tempfile.mkstemp(suffix=".sh")
+        try:
+            with os.fdopen(askpass_fd, "w") as f:
+                f.write(f"#!/bin/bash\necho '{self._password}'\n")
+            os.chmod(askpass_path, 0o700)
+
+            env = os.environ.copy()
+            env["SSH_ASKPASS"] = askpass_path
+            env["SSH_ASKPASS_REQUIRE"] = "force"
+            env["DISPLAY"] = ":0"
+
+            start = time.time()
+            result = subprocess.run(
+                ["scp", "-o", "StrictHostKeyChecking=no", "-o", "Compression=no",
+                 local_path, f"{self._username}@{self._host}:{remote_path}"],
+                capture_output=True, text=True, timeout=600, env=env,
+            )
+            elapsed = time.time() - start
+
+            if result.returncode != 0:
+                raise RuntimeError(f"SCP exit code {result.returncode}: {result.stderr[:200]}")
+
+            speed = (file_size / (1024 * 1024)) / elapsed if elapsed > 0 else 0
+            logger.info("SCP upload complete: %.0fMB in %.1fs (%.1f MB/s)",
+                        file_size / (1024 * 1024), elapsed, speed)
+
+            if on_progress:
+                on_progress(100)
+        finally:
+            os.unlink(askpass_path)
+
+    def _upload_sftp(
+        self,
+        local_path: str,
+        remote_path: str,
+        on_progress: Optional[Callable[[int], None]] = None,
+    ):
+        """Upload via Paramiko SFTP (fallback)."""
         sftp = self.client.open_sftp()
         try:
             last_pct = -10
@@ -113,7 +177,7 @@ def connect(host: str, username: str, password: str, timeout: int = 10) -> SSHCo
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(host, port=22, username=username, password=password, timeout=timeout)
-    return SSHConnection(client)
+    return SSHConnection(client, host=host, username=username, password=password)
 
 
 def test_connection(host: str, username: str, password: str) -> dict:
