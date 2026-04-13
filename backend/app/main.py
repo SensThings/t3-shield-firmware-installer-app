@@ -17,8 +17,9 @@ app = FastAPI(title="T3-Shield Installer API", version=APP_VERSION)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    allow_credentials=False,
 )
 
 app.include_router(install.router)

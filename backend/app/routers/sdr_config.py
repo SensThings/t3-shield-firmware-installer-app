@@ -1,8 +1,9 @@
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -29,7 +30,7 @@ async def get_sdr_config():
 
 
 @router.put("/config/sdr-test")
-async def update_sdr_config(config: dict):
+async def update_sdr_config(config: dict[str, Any] = Body(...)):
     current = _read_config(SDR_CONFIG)
     current.update(config)
     _write_config(SDR_CONFIG, current)
@@ -43,7 +44,7 @@ async def get_antenna_config():
 
 
 @router.put("/config/antenna-test")
-async def update_antenna_config(config: dict):
+async def update_antenna_config(config: dict[str, Any] = Body(...)):
     current = _read_config(ANTENNA_CONFIG)
     current.update(config)
     _write_config(ANTENNA_CONFIG, current)
