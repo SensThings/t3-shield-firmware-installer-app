@@ -82,7 +82,8 @@ def run_antenna_test(label: str, dual_channel: bool, emit: Callable):
         # === PREP: Start TX (single channel, on SDR #1) ===
         emit("prep_step", {"step_id": "start_transmitter", "status": "in_progress", "message": "Démarrage émetteur..."})
 
-        config_file = str(SDR_DIR / "antenna_test_config.json")
+        user_config = Path.home() / ".t3s-installer" / "antenna_test_config.json"
+        config_file = str(user_config if user_config.exists() else SDR_DIR / "antenna_test_config.json")
         tx_script = str(SDR_DIR / "tx_tone.py")
         tx_proc = subprocess.Popen(
             ["python3", tx_script, "--channels", "1", "--device", tx_serial, "--config", config_file],

@@ -69,7 +69,9 @@ def run_sdr_test(serial_number: str, settings, emit: Callable, dual_channel: boo
         conn.upload_file((SDR_DIR / "config.py").read_text(), "/tmp/sdr/config.py")
         conn.upload_file((SDR_DIR / "rx_tone.py").read_text(), "/tmp/sdr/rx_tone.py")
         conn.upload_file((SDR_DIR / "test.sh").read_text(), "/tmp/sdr/test.sh")
-        conn.upload_file((SDR_DIR / "sdr_test_config.json").read_text(), "/tmp/sdr/sdr_test_config.json")
+        user_sdr_cfg = Path.home() / ".t3s-installer" / "sdr_test_config.json"
+        sdr_cfg_path = user_sdr_cfg if user_sdr_cfg.exists() else SDR_DIR / "sdr_test_config.json"
+        conn.upload_file(sdr_cfg_path.read_text(), "/tmp/sdr/sdr_test_config.json")
         logger.info("Uploaded SDR test scripts to Pi")
 
         emit("prep_step", {"step_id": "upload_test_scripts", "status": "pass", "message": "Test scripts uploaded"})
@@ -77,7 +79,9 @@ def run_sdr_test(serial_number: str, settings, emit: Callable, dual_channel: boo
         # === PREP: Start TX locally ===
         emit("prep_step", {"step_id": "start_transmitter", "status": "in_progress", "message": "Starting transmitter..."})
 
-        config_file = str(SDR_DIR / "sdr_test_config.json")
+        # Use user-writable config if it exists, else fall back to default
+        user_config = Path.home() / ".t3s-installer" / "sdr_test_config.json"
+        config_file = str(user_config if user_config.exists() else SDR_DIR / "sdr_test_config.json")
         capture_duration = 5
         tx_script = str(SDR_DIR / "tx_tone.py")
 
