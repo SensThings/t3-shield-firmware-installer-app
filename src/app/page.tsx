@@ -8,11 +8,15 @@ import SettingsPanel from '@/components/SettingsPanel';
 import { Settings, DEFAULT_SETTINGS } from '@/lib/types';
 import { loadSettings, saveSettings } from '@/lib/settings';
 import { isLoggedIn, getAuth, clearAuth, UserRole } from '@/lib/auth';
+import { updateDeviceSettings } from '@/lib/api';
+import PasswordPrompt from '@/components/PasswordPrompt';
 
 export default function Home() {
   const router = useRouter();
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [passwordError, setPasswordError] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [operatorName, setOperatorName] = useState('');
   const [userRole, setUserRole] = useState<UserRole>('op');
@@ -36,6 +40,15 @@ export default function Home() {
   const handleSaveSettings = (newSettings: Settings) => {
     setSettings(newSettings);
     saveSettings(newSettings);
+    // Also persist to backend JSON
+    updateDeviceSettings({
+      device_ip: newSettings.deviceIp,
+      ssh_username: newSettings.sshUsername,
+      ssh_password: newSettings.sshPassword,
+      ghcr_username: newSettings.ghcrUsername,
+      ghcr_token: newSettings.ghcrToken,
+      firmware_image: newSettings.firmwareImage,
+    }).catch(() => {});
   };
 
   const handleSessionTimer = useCallback((seconds: number) => {
@@ -57,6 +70,21 @@ export default function Home() {
     setSessionKey(prev => prev + 1);
   };
 
+  const handleSettingsClick = () => {
+    setPasswordError(false);
+    setShowPasswordPrompt(true);
+  };
+
+  const handlePasswordSubmit = (password: string) => {
+    if (password === 'T3Shield2026!') {
+      setShowPasswordPrompt(false);
+      setPasswordError(false);
+      setShowSettings(true);
+    } else {
+      setPasswordError(true);
+    }
+  };
+
   const handleLogout = () => {
     clearAuth();
     router.replace('/login');
@@ -73,7 +101,7 @@ export default function Home() {
   return (
     <>
       <Header
-        onSettingsClick={() => setShowSettings(true)}
+        onSettingsClick={handleSettingsClick}
         settings={settings}
         operatorName={operatorName}
         sessionSeconds={sessionSeconds >= 0 ? sessionSeconds : undefined}
@@ -92,9 +120,16 @@ export default function Home() {
           paused={sessionPaused}
           onSessionTimer={handleSessionTimer}
           onDeviceCount={handleDeviceCount}
-          onOpenSettings={() => setShowSettings(true)}
+          onOpenSettings={handleSettingsClick}
         />
       </main>
+      {showPasswordPrompt && (
+        <PasswordPrompt
+          onSubmit={handlePasswordSubmit}
+          onClose={() => setShowPasswordPrompt(false)}
+          error={passwordError}
+        />
+      )}
       {showSettings && (
         <SettingsPanel
           settings={settings}

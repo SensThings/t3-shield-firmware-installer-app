@@ -79,3 +79,50 @@ async def update_antenna_config(config: dict[str, Any] = Body(...)):
     _write_config("antenna", current)
     logger.info("Antenna test config updated: %s", list(config.keys()))
     return current
+
+
+# --- Device settings (SSH, GHCR, firmware image) ---
+
+_SETTINGS_DEFAULTS = {
+    "device_ip": "192.168.137.100",
+    "ssh_username": "dragon",
+    "ssh_password": "Sensthings@012",
+    "ghcr_username": "elmoadin",
+    "ghcr_token": "",
+    "firmware_image": "ghcr.io/sensthings/t3shield-firmware:latest",
+}
+
+_SETTINGS_FILE = DATA_DIR / "settings.json"
+
+
+def _read_settings() -> dict:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    if not _SETTINGS_FILE.exists():
+        _SETTINGS_FILE.write_text(json.dumps(_SETTINGS_DEFAULTS, indent=4) + "\n")
+    try:
+        return json.loads(_SETTINGS_FILE.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return dict(_SETTINGS_DEFAULTS)
+
+
+def _write_settings(data: dict):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        _SETTINGS_FILE.write_text(json.dumps(data, indent=4) + "\n")
+    except OSError as e:
+        logger.error("Failed to write settings: %s", e)
+        raise HTTPException(status_code=500, detail=f"Cannot write settings: {e}")
+
+
+@router.get("/config/settings")
+async def get_settings():
+    return _read_settings()
+
+
+@router.put("/config/settings")
+async def update_settings(config: dict[str, Any] = Body(...)):
+    current = _read_settings()
+    current.update(config)
+    _write_settings(current)
+    logger.info("Device settings updated: %s", list(config.keys()))
+    return current

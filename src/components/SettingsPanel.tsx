@@ -11,6 +11,7 @@ import {
   updateSdrTestConfig,
   getAntennaTestConfig,
   updateAntennaTestConfig,
+  getDeviceSettings,
 } from '@/lib/api';
 
 interface SettingsPanelProps {
@@ -76,8 +77,40 @@ export default function SettingsPanel({ settings, role = 'op', onSave, onClose }
     getAntennaTestConfig().then(setAntennaConfig).catch(() => {});
   }, []);
 
+  const [refreshing2, setRefreshing2] = useState(false);
+  const [refreshMsg, setRefreshMsg] = useState('');
+
   const update = (key: keyof Settings, value: string) => {
     setForm(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleRefreshSettings = async () => {
+    setRefreshing2(true);
+    setRefreshMsg('');
+    try {
+      const [deviceSettings, sdr, antenna] = await Promise.all([
+        getDeviceSettings(),
+        getSdrTestConfig(),
+        getAntennaTestConfig(),
+      ]);
+      // Update device settings form
+      setForm({
+        deviceIp: deviceSettings.device_ip || form.deviceIp,
+        sshUsername: deviceSettings.ssh_username || form.sshUsername,
+        sshPassword: deviceSettings.ssh_password || form.sshPassword,
+        ghcrUsername: deviceSettings.ghcr_username || form.ghcrUsername,
+        ghcrToken: deviceSettings.ghcr_token || form.ghcrToken,
+        firmwareImage: deviceSettings.firmware_image || form.firmwareImage,
+      });
+      setSdrConfig(sdr);
+      setAntennaConfig(antenna);
+      setRefreshMsg('Paramètres rechargés');
+    } catch {
+      setRefreshMsg('Erreur de chargement');
+    } finally {
+      setRefreshing2(false);
+      setTimeout(() => setRefreshMsg(''), 3000);
+    }
   };
 
   const handleTestConnection = async () => {
@@ -262,7 +295,17 @@ export default function SettingsPanel({ settings, role = 'op', onSave, onClose }
           )}
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefreshSettings}
+              disabled={refreshing2}
+              className="px-3 py-2 text-sm bg-zinc-700 hover:bg-zinc-600 disabled:opacity-50 text-zinc-200 rounded-lg transition-colors"
+            >
+              {refreshing2 ? 'Chargement...' : 'Rafraîchir'}
+            </button>
+            {refreshMsg && <span className="text-xs text-zinc-400">{refreshMsg}</span>}
+          </div>
           <button onClick={handleSave} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors">
             Enregistrer
           </button>
