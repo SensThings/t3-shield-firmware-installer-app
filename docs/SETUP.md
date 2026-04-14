@@ -339,7 +339,7 @@ docker logs -f t3s-frontend
 5. Complete the pre-flight checklist (all items must be "Oui")
 6. Enter the serial number from the device label
 7. Click **Démarrer**
-8. Wait for all 18 steps to complete (typically 5-10 minutes, first device is slower due to file caching)
+8. Wait for all 14 steps to complete (typically 5-10 minutes, first device is slower due to file caching)
 9. If PASS: click **Appareil suivant** for the next device
 10. If FAIL: check the error message, fix the issue, click **Réessayer**
 

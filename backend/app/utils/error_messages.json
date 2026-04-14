@@ -6,9 +6,6 @@
     "expand_partition": {
       "fail": "L'espace de stockage n'a pas pu être étendu. La carte SD est peut-être endommagée — essayez une autre carte."
     },
-    "configure_network": {
-      "fail": "Configuration réseau échouée. Mode hors ligne — cette étape est normalement ignorée."
-    },
     "docker_install": {
       "fail": "L'installation du moteur logiciel a échoué. Vérifiez que l'image de base est correcte sur la carte SD."
     },
@@ -17,9 +14,6 @@
     },
     "write_config": {
       "fail": "La configuration par défaut n'a pas pu être écrite. Réessayez ou signalez au responsable."
-    },
-    "registry_login": {
-      "fail": "Connexion au registre échouée. Mode hors ligne — cette étape est normalement ignorée."
     },
     "pull_image": {
       "fail": "Le firmware n'a pas pu être chargé sur l'appareil. Vérifiez que le fichier firmware est à jour (cliquez Rafraîchir dans Paramètres)."
@@ -33,12 +27,7 @@
     "health_check": {
       "fail": "Le firmware a démarré mais ne répond pas. Débranchez l'appareil, attendez 10 secondes, rebranchez, puis réessayez."
     },
-    "sdr_warmup": {
-      "fail": "Le récepteur de signal n'a pas pu s'initialiser. Vérifiez la connexion USB du SDR sur l'appareil."
-    },
-    "sdr_verify": {
-      "fail": "Le récepteur de signal n'est pas prêt. Débranchez le câble USB du SDR de l'appareil, rebranchez-le, puis réessayez."
-    },
+,
     "tar_create": {
       "fail": "Impossible de créer l'archive Docker. Vérifiez l'espace disque du poste."
     },

@@ -317,6 +317,7 @@ def run_antenna_test(label: str, dual_channel: bool, emit: Callable):
         write_operation_log(
             operation="antenna-test", serial=label or "unnamed", result=result["result"],
             config=config, metrics=rx_result, diagnosis=diagnosis,
+            stderr_files={"tx": "/tmp/t3s-antenna-tx-stderr.log", "rx": "/tmp/antenna-rx-stderr.log"},
         )
         emit("test_complete", result)
         return result
@@ -339,6 +340,7 @@ def run_antenna_test(label: str, dual_channel: bool, emit: Callable):
         write_operation_log(
             operation="antenna-test", serial=label or "unnamed", result="fail",
             config=config, error=msg,
+            stderr_files={"tx": "/tmp/t3s-antenna-tx-stderr.log", "rx": "/tmp/antenna-rx-stderr.log"},
         )
         emit("test_error", {"error": msg, "operator_message": operator_msg})
         raise

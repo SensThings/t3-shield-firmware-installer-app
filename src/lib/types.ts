@@ -40,20 +40,16 @@ export const INSTALL_STEPS: { id: string; label: string; source: 'prep' | 'insta
   { id: 'upload_script', label: 'Transférer le script d\'installation', source: 'prep' },
   { id: 'upload_docker', label: 'Transférer les binaires Docker', source: 'prep' },
   { id: 'upload_firmware', label: 'Transférer l\'image firmware', source: 'prep' },
-  // Install phase (updated via step_update events by step_number)
+  // Install phase (updated via step_update events by step_number, 9 steps)
   { id: 'set_hostname', label: 'Définir le nom de l\'appareil', source: 'install' },
   { id: 'expand_partition', label: 'Étendre la partition SD', source: 'install' },
-  { id: 'configure_network', label: 'Configurer le réseau', source: 'install' },
   { id: 'docker_install', label: 'Installer Docker', source: 'install' },
   { id: 'create_dirs', label: 'Créer les répertoires', source: 'install' },
   { id: 'write_config', label: 'Écrire la configuration', source: 'install' },
-  { id: 'registry_login', label: 'Connexion au registre', source: 'install' },
-  { id: 'pull_image', label: 'Télécharger l\'image firmware', source: 'install' },
+  { id: 'pull_image', label: 'Charger l\'image firmware', source: 'install' },
   { id: 'install_update_script', label: 'Installer le script de mise à jour', source: 'install' },
   { id: 'start_container', label: 'Démarrer le conteneur', source: 'install' },
   { id: 'health_check', label: 'Vérification de santé', source: 'install' },
-  { id: 'sdr_warmup', label: 'Préchauffage SDR', source: 'install' },
-  { id: 'sdr_verify', label: 'Vérifier le statut SDR', source: 'install' },
 ];
 
 // Unified SDR test steps: prep + test in one list, French labels

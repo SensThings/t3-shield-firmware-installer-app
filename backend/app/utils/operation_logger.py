@@ -6,12 +6,44 @@ Each file is a complete record for remote diagnosis.
 
 import json
 import logging
+import platform
+import socket
 from datetime import datetime, timezone
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 LOG_BASE = Path.home() / ".t3s-installer" / "logs"
+
+
+def _get_app_version() -> str:
+    """Read app version from VERSION file."""
+    for p in [Path(__file__).parent.parent.parent.parent / "VERSION",
+              Path("/opt/t3s-installer/VERSION")]:
+        try:
+            return p.read_text().strip()
+        except (FileNotFoundError, OSError):
+            continue
+    return "unknown"
+
+
+def _get_system_info() -> dict:
+    """Collect system info for the log."""
+    return {
+        "app_version": _get_app_version(),
+        "hostname": socket.gethostname(),
+        "platform": platform.platform(),
+    }
+
+
+def _read_stderr_file(path: str, max_lines: int = 50) -> str | None:
+    """Read last N lines of a stderr log file."""
+    try:
+        content = Path(path).read_text()
+        lines = content.strip().split("\n")
+        return "\n".join(lines[-max_lines:]) if lines else None
+    except (FileNotFoundError, OSError):
+        return None
 
 
 def write_operation_log(
@@ -23,6 +55,7 @@ def write_operation_log(
     diagnosis: dict | None = None,
     steps: list | None = None,
     error: str | None = None,
+    stderr_files: dict[str, str] | None = None,
     extra: dict | None = None,
 ):
     """Write a detailed JSON log file for one operation.
@@ -36,6 +69,7 @@ def write_operation_log(
         diagnosis: diagnosis dict from error_handler
         steps: list of step results with durations
         error: error message if failed
+        stderr_files: dict of label → file path to capture stderr from (e.g., {"tx": "/tmp/t3s-tx-stderr.log"})
         extra: any additional data to include
     """
     log_dir = LOG_BASE / operation
@@ -46,16 +80,26 @@ def write_operation_log(
     safe_serial = serial.replace("/", "-").replace(" ", "_") or "unknown"
     filename = f"{timestamp}_{safe_serial}.json"
 
+    # Capture stderr from specified files
+    captured_stderr = {}
+    if stderr_files:
+        for label, path in stderr_files.items():
+            content = _read_stderr_file(path)
+            if content:
+                captured_stderr[label] = content
+
     log_entry = {
         "timestamp": now.isoformat(),
         "operation": operation,
         "serial": serial,
         "result": result,
+        "system": _get_system_info(),
         "config": config,
         "metrics": metrics,
         "diagnosis": diagnosis,
         "steps": steps,
         "error": error,
+        "stderr": captured_stderr or None,
     }
     if extra:
         log_entry.update(extra)
