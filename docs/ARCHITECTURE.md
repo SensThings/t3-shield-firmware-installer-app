@@ -154,7 +154,7 @@ Event types by operation:
 
 ---
 
-## Install Flow (18 unified steps)
+## Install Flow (14 unified steps)
 
 The frontend shows one continuous checklist. Behind the scenes, steps 1-5 are "prep" (run on desktop), steps 6-18 are "install" (run on Pi via install.sh).
 
@@ -174,17 +174,13 @@ The frontend shows one continuous checklist. Behind the scenes, steps 1-5 are "p
 |---|-----|-------|-------------|
 | 6 | `set_hostname` | Définir le nom de l'appareil | `hostnamectl set-hostname <serial>` (raw serial, no prefix) |
 | 7 | `expand_partition` | Étendre la partition SD | `parted` + `resize2fs` on root partition |
-| 8 | `configure_network` | Configurer le réseau | Set default route + DNS (online mode only) |
-| 9 | `docker_install` | Installer Docker | Extract static binaries, create systemd services |
-| 10 | `create_dirs` | Créer les répertoires | `/data/logs`, `/data/scan_results`, `/opt/t3shield` |
-| 11 | `write_config` | Écrire la configuration | Default `/data/config.json` |
-| 12 | `registry_login` | Connexion au registre | Skipped in offline mode |
-| 13 | `pull_image` | Télécharger l'image firmware | `docker load < /tmp/firmware.tar` |
-| 14 | `install_update_script` | Installer le script de mise à jour | OTA update script → `/opt/t3shield/update.sh` |
-| 15 | `start_container` | Démarrer le conteneur | `docker run --privileged --network host ...` |
-| 16 | `health_check` | Vérification de santé | Poll `localhost:8080/api/system/ping` (120s timeout) |
-| 17 | `sdr_warmup` | Préchauffage SDR | POST `localhost:8080/api/sdr/warmup` |
-| 18 | `sdr_verify` | Vérifier le statut SDR | Poll `/api/sdr/status` until "ready" (30s) |
+| 8 | `docker_install` | Installer Docker | Extract static binaries, create systemd services |
+| 9 | `create_dirs` | Créer les répertoires | `/data/logs`, `/data/scan_results`, `/opt/t3shield` |
+| 10 | `write_config` | Écrire la configuration | Default `/data/config.json` |
+| 11 | `pull_image` | Charger l'image firmware | `docker load < /tmp/firmware.tar` |
+| 12 | `install_update_script` | Installer le script de mise à jour | OTA update script → `/opt/t3shield/update.sh` |
+| 13 | `start_container` | Démarrer le conteneur | `docker run --privileged --network host ...` |
+| 14 | `health_check` | Vérification de santé | Poll `localhost:5000/api/system/ping` (120s timeout) |
 
 ---
 
@@ -234,7 +230,7 @@ Session Started (timer running)
   ↓
 ┌─→ Enter Serial Number
 │     ↓
-│   Programming (18 steps, real-time progress)
+│   Programming (14 steps, real-time progress)
 │     ↓
 │   PASS → "Appareil suivant" (device count +1) ─→ back to serial input
 │   FAIL → "Réessayer" or "Autre appareil"

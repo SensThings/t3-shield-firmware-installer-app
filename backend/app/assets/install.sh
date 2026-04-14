@@ -73,7 +73,7 @@ fi
 STEPS_JSON="[]"
 OPERATION_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 FAILED=false
-TOTAL_STEPS=13
+TOTAL_STEPS=9
 
 log() {
     # Human-readable output goes to stderr so it doesn't pollute JSON on stdout
@@ -260,54 +260,6 @@ step_expand_partition() {
     return 0
 }
 
-step_configure_network() {
-    # In offline mode, no internet needed
-    if [[ -n "$IMAGE_TAR" ]]; then
-        echo "Offline mode — no internet required"
-        return 0
-    fi
-
-    if [[ -z "$GATEWAY_IP" ]]; then
-        # No gateway specified — check if we already have internet
-        if curl -sf --connect-timeout 5 https://get.docker.com >/dev/null 2>&1; then
-            echo "Internet already available"
-            return 0
-        fi
-        echo "No internet and no --gateway provided. Use --image-tar for offline install."
-        return 1
-    fi
-
-    # Find the active Ethernet interface (usually eth0)
-    local eth_iface
-    eth_iface=$(ip -o link show | grep -E 'eth[0-9]|enp|ens' | grep 'state UP' | head -1 | awk -F: '{print $2}' | tr -d ' ')
-    if [[ -z "$eth_iface" ]]; then
-        eth_iface="eth0"
-    fi
-
-    # Add default route via gateway
-    ip route replace default via "$GATEWAY_IP" dev "$eth_iface" 2>/dev/null
-
-    # Set DNS (use gateway as DNS if it's a NAT router, plus Google DNS as fallback)
-    cat > /etc/resolv.conf <<DNSEOF
-nameserver $GATEWAY_IP
-nameserver 8.8.8.8
-nameserver 8.8.4.4
-DNSEOF
-
-    # Verify internet connectivity
-    local retries=3
-    for i in $(seq 1 $retries); do
-        if curl -sf --connect-timeout 5 https://get.docker.com >/dev/null 2>&1; then
-            echo "Network configured via $GATEWAY_IP"
-            return 0
-        fi
-        sleep 1
-    done
-
-    echo "Network configured but cannot reach internet via $GATEWAY_IP"
-    return 1
-}
-
 step_docker_install() {
     if command -v docker &>/dev/null; then
         echo "Docker already installed"
@@ -455,23 +407,6 @@ CONFIGEOF
         return 0
     else
         echo "Failed to write config"
-        return 1
-    fi
-}
-
-step_registry_login() {
-    if [[ -n "$IMAGE_TAR" ]]; then
-        echo "Skipped (offline mode)"
-        return 0
-    fi
-    local output
-    output=$(echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin 2>&1)
-    local rc=$?
-    if [[ $rc -eq 0 ]]; then
-        echo "Login succeeded"
-        return 0
-    else
-        echo "Login failed: $output"
         return 1
     fi
 }
@@ -662,43 +597,6 @@ step_health_check() {
     return 1
 }
 
-step_sdr_warmup() {
-    local response
-    response=$(curl -sf -X POST http://localhost:5000/api/sdr/warmup 2>&1)
-    local rc=$?
-    if [[ $rc -eq 0 ]]; then
-        echo "SDR warmup triggered"
-        return 0
-    else
-        echo "SDR warmup request failed: $response"
-        return 1
-    fi
-}
-
-step_sdr_verify() {
-    # Wait up to 30s for SDR to become ready
-    for i in $(seq 1 15); do
-        local response
-        response=$(curl -sf http://localhost:5000/api/sdr/status 2>/dev/null)
-        if [[ $? -eq 0 ]]; then
-            local status
-            status=$(echo "$response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-            if [[ "$status" == "ready" ]]; then
-                echo "SDR ready"
-                return 0
-            elif [[ "$status" == "error" ]]; then
-                local msg
-                msg=$(echo "$response" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
-                echo "SDR error: $msg"
-                return 1
-            fi
-        fi
-        sleep 2
-    done
-    echo "SDR did not become ready within 30s"
-    return 1
-}
-
 # ── Execute Steps ────────────────────────────────────────────────────────────
 
 log "====================================="
@@ -706,19 +604,15 @@ log "T3-Shield Firmware — Device Setup"
 log "====================================="
 log "Image: $IMAGE"
 
-run_step 1  "set_hostname"          "Set device hostname"      step_set_hostname
-run_step 2  "expand_partition"     "Expand SD card partition" step_expand_partition
-run_step 3  "configure_network"    "Configure network"        step_configure_network
-run_step 4  "docker_install"        "Install Docker"           step_docker_install
-run_step 5  "create_dirs"           "Create data directories"  step_create_dirs
-run_step 6  "write_config"          "Write default config"     step_write_config
-run_step 7  "registry_login"        "Login to registry"        step_registry_login
-run_step 8  "pull_image"            "Pull firmware image"      step_pull_image
-run_step 9  "install_update_script" "Install update script"    step_install_update_script
-run_step 10 "start_container"       "Start container"          step_start_container
-run_step 11 "health_check"          "Health check"             step_health_check
-run_step 12 "sdr_warmup"            "SDR warmup"               step_sdr_warmup
-run_step 13 "sdr_verify"            "Verify SDR status"        step_sdr_verify
+run_step 1 "set_hostname"          "Set device hostname"      step_set_hostname
+run_step 2 "expand_partition"     "Expand SD card partition" step_expand_partition
+run_step 3 "docker_install"       "Install Docker"           step_docker_install
+run_step 4 "create_dirs"          "Create data directories"  step_create_dirs
+run_step 5 "write_config"         "Write default config"     step_write_config
+run_step 6 "pull_image"           "Load firmware image"      step_pull_image
+run_step 7 "install_update_script" "Install update script"   step_install_update_script
+run_step 8 "start_container"      "Start container"          step_start_container
+run_step 9 "health_check"         "Health check"             step_health_check
 
 emit_result
 

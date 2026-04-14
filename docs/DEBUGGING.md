@@ -185,7 +185,7 @@ sudo docker ps -a | grep t3shield
 sudo bash /tmp/install.sh --image-tar /tmp/firmware.tar --hostname T3S-DEBUG --json 2>&1
 ```
 
-This shows all 13 steps with their output directly in the terminal. You'll see exactly which step fails and why.
+This shows all 9 steps with their output directly in the terminal. You'll see exactly which step fails and why.
 
 ### 4.4 Check firmware container health
 

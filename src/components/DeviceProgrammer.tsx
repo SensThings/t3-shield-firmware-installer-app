@@ -66,7 +66,7 @@ export default function DeviceProgrammer({ settings, role = 'op', onDeviceProgra
       return {
         ...s,
         status: update.status,
-        message: update.operator_message || update.message,
+        message: update.operator_message || (update.status === 'fail' ? update.message : undefined),
         // Only set startedAt on first in_progress (don't reset on progress updates)
         startedAt: isStarting && !s.startedAt ? Date.now() : s.startedAt,
         // Calculate duration when step completes
@@ -85,7 +85,7 @@ export default function DeviceProgrammer({ settings, role = 'op', onDeviceProgra
         next[idx] = {
           ...next[idx],
           status: update.status,
-          message: update.operator_message || update.message || next[idx].message,
+          message: update.operator_message || (update.status === 'fail' ? update.message : undefined) || next[idx].message,
           duration: update.duration ?? (isComplete && next[idx].startedAt ? (Date.now() - next[idx].startedAt) / 1000 : next[idx].duration),
           startedAt: isStarting && !next[idx].startedAt ? Date.now() : next[idx].startedAt,
         };

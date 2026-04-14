@@ -117,12 +117,8 @@ const StepRow = memo(function StepRow({ step }: { step: InstallStep }) {
             <span className="text-xs text-amber-500 font-mono">{liveElapsed.toFixed(1)}s...</span>
           )}
         </div>
-        {step.message && step.status !== 'pending' && (
-          <p
-            className={`text-xs mt-0.5 ${
-              step.status === 'fail' ? 'text-red-400/80' : 'text-zinc-500'
-            }`}
-          >
+        {step.message && step.status === 'fail' && (
+          <p className="text-xs mt-0.5 text-red-400/80">
             {step.message}
           </p>
         )}

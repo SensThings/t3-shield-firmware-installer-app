@@ -62,7 +62,7 @@ Settings are password-protected: `T3Shield2026!`
 
 ## Session Workflow
 
-Login → Pre-flight checklist → Serial input → Program (18 steps) → SDR Test (6 steps) → Next device
+Login → Pre-flight checklist → Serial input → Program (14 steps: 5 prep + 9 install) → SDR Test (6 steps) → Next device
 
 Antenna test desktop has a separate flow: Login → Antenna Test (5 steps) → Next antenna
 

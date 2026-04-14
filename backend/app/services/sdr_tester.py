@@ -241,6 +241,7 @@ def run_sdr_test(serial_number: str, settings, emit: Callable, dual_channel: boo
                 operation="sdr-test", serial=serial_number, result=test_result.get("result", "fail"),
                 config=config, metrics=test_result.get("metrics"),
                 diagnosis=test_result.get("diagnosis"), steps=test_result.get("steps"),
+                stderr_files={"tx": "/tmp/t3s-tx-stderr.log"},
             )
             emit("test_complete", test_result)
             return test_result
@@ -255,6 +256,7 @@ def run_sdr_test(serial_number: str, settings, emit: Callable, dual_channel: boo
         write_operation_log(
             operation="sdr-test", serial=serial_number, result="fail",
             config=config, error="No JSON result from test.sh",
+            stderr_files={"tx": "/tmp/t3s-tx-stderr.log"},
         )
         emit("test_complete", fail_result)
         return fail_result
@@ -279,6 +281,7 @@ def run_sdr_test(serial_number: str, settings, emit: Callable, dual_channel: boo
         write_operation_log(
             operation="sdr-test", serial=serial_number, result="fail",
             config=config, error=msg,
+            stderr_files={"tx": "/tmp/t3s-tx-stderr.log"},
         )
         emit("test_error", {"error": msg, "operator_message": operator_msg})
         raise
