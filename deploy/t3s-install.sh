@@ -6,7 +6,7 @@
 # Frontend runs in Docker
 # =============================================================================
 GHCR_USER="elmoadin"
-GHCR_TOKEN="REPLACE_WITH_YOUR_GHCR_TOKEN"
+GHCR_TOKEN="${GHCR_TOKEN:-REPLACE_WITH_YOUR_GHCR_TOKEN}"
 REGISTRY="ghcr.io"
 INSTALL_DIR="/opt/t3s-installer"
 BACKEND_REPO="https://github.com/SensThings/t3-shield-firmware-installer-app.git"

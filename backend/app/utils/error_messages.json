@@ -27,7 +27,6 @@
     "health_check": {
       "fail": "Le firmware a démarré mais ne répond pas. Débranchez l'appareil, attendez 10 secondes, rebranchez, puis réessayez."
     },
-,
     "tar_create": {
       "fail": "Impossible de créer l'archive Docker. Vérifiez l'espace disque du poste."
     },
