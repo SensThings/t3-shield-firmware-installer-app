@@ -515,27 +515,12 @@ step_health() {
     done
     echo "Health check timed out after 120s"; return 1
 }
-step_warmup() {
-    curl -sf -X POST http://localhost:5000/api/sdr/warmup >/dev/null 2>&1 && echo "SDR warmup triggered" || { echo "SDR warmup failed"; return 1; }
-}
-step_sdr() {
-    for i in $(seq 1 15); do
-        local st; st=$(curl -sf http://localhost:5000/api/sdr/status 2>/dev/null | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-        [[ "$st" == "ready" ]] && { echo "SDR ready"; return 0; }
-        [[ "$st" == "error" ]] && { echo "SDR error"; return 1; }
-        sleep 2
-    done
-    echo "SDR not ready within 30s"; return 1
-}
-
 log "T3-Shield Firmware — OTA Update"
 log "Image: $IMAGE"
-run_step 1 "pull_image"       "Pull latest image"    step_pull    6
-run_step 2 "stop_old"         "Stop old container"   step_stop    6
-run_step 3 "start_container"  "Start new container"  step_start   6
-run_step 4 "health_check"     "Health check"         step_health  6
-run_step 5 "sdr_warmup"       "SDR warmup"           step_warmup  6
-run_step 6 "sdr_verify"       "Verify SDR status"    step_sdr     6
+run_step 1 "pull_image"       "Pull latest image"    step_pull    4
+run_step 2 "stop_old"         "Stop old container"   step_stop    4
+run_step 3 "start_container"  "Start new container"  step_start   4
+run_step 4 "health_check"     "Health check"         step_health  4
 
 finished_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 overall="pass"; [[ "$FAILED" == "true" ]] && overall="fail"

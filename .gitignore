@@ -59,3 +59,4 @@ INITIAL_PROMPT.md
 sdr_ui_test-master/
 *.jpeg
 .env.local
+firmware.tar
